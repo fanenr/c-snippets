@@ -22,9 +22,12 @@ main ()
   /* defer */
   defer (printf ("e"));
 
+#define auto_char_t char dtor (clean_ch)
+
   /* destructor */
-  char ch1 dtor (clean_ch) = 'c';
+  auto_char_t ch1 = 'c';
   char ch2 dtor (clean_ch) = 'b';
+
   char ch3 = ({
     char tmp;
     if (ch1 == 'c')
@@ -33,5 +36,6 @@ main ()
       tmp = ch2;
     tmp;
   });
+  
   printf ("%c", ch3);
 }
