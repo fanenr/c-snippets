@@ -104,27 +104,27 @@ main (int argc, char **args)
       switch (tok.kind)
         {
         case TK_ID:
-          printf ("%d 标识符 %s\n", num, tok.sval);
+          printf ("%d\t标识符\t\t%s\n", num, tok.sval);
           break;
 
         case TK_NUM:
-          printf ("%d 常数 %d\n", num, tok.ival);
+          printf ("%d\t常数\t\t%d\n", num, tok.ival);
           break;
 
         case TK_UNKNOW:
-          printf ("%d 非法 %s\n", num, tok.sval);
+          printf ("%d\t非法\t\t%s\n", num, tok.sval);
           break;
 
         case TK_OP_ST + 1 ... TK_OP_ED - 1:
-          printf ("%d 运算符 %s\n", num, tok.sval);
+          printf ("%d\t运算符\t\t%s\n", num, tok.sval);
           break;
 
         case TK_KEY_ST + 1 ... TK_KEY_ED - 1:
-          printf ("%d 保留字 %s\n", num, tok.sval);
+          printf ("%d\t保留字\t\t%s\n", num, tok.sval);
           break;
 
         case TK_SEP_ST + 1 ... TK_SEP_ED - 1:
-          printf ("%d 界符 %s\n", num, tok.sval);
+          printf ("%d\t界符\t\t%s\n", num, tok.sval);
           if (end && tok.kind == TK_SEP_DOT)
             goto end;
           break;
@@ -145,38 +145,27 @@ tok_next (void)
 {
   char ch;
   int len = 0;
+  FILE *file = ctx.file;
 
-  for (;;)
-    { /* skip white space */
-      ch = fgetc (ctx.file);
-      if (isspace (ch))
-        continue;
-      if (ch != EOF)
-        break;
-      return false;
-    }
+  for (; isspace ((ch = fgetc (file)));)
+    ; /* skip white space */
+
+  if (ch == EOF)
+    return false;
 
   if (isalpha (ch))
     { /* match identifier */
       tok.kind = TK_ID;
       tok.sval[len++] = ch;
 
-      for (;;)
-        {
-          ch = fgetc (ctx.file);
-          if (isalnum (ch))
-            tok.sval[len++] = ch;
-          else
-            {
-              ungetc (ch, ctx.file);
-              break;
-            }
-        }
+      for (; isalnum ((ch = fgetc (file)));)
+        tok.sval[len++] = ch;
 
+      ungetc (ch, file);
       tok.sval[len] = 0;
 
       for (int i = TK_KEY_ST + 1; i < TK_KEY_ED; i++)
-        {
+        { /* determine whether it's a keyword */
           if (strcmp (tok.sval, tk_keys[i]) != 0)
             continue;
           tok.kind = i;
@@ -191,110 +180,102 @@ tok_next (void)
       tok.kind = TK_NUM;
       tok.ival = ch - '0';
 
-      for (;;)
-        {
-          ch = fgetc (ctx.file);
-          if (isdigit (ch))
-            tok.ival = tok.ival * 10 + ch - '0';
-          else
-            {
-              ungetc (ch, ctx.file);
-              break;
-            }
-        }
+      for (; isdigit ((ch = fgetc (file)));)
+        tok.ival = tok.ival * 10 + ch - '0';
 
+      ungetc (ch, file);
       goto end;
     }
+
+  int kind;
+  const char *sval;
 
   switch (ch)
     {
     case ',':
-      tok.kind = TK_SEP_COMMA;
-      strcpy (tok.sval, ",");
-      goto end;
+      kind = TK_SEP_COMMA;
+      sval = ",";
+      break;
 
     case ';':
-      tok.kind = TK_SEP_SEMI;
-      strcpy (tok.sval, ";");
+      kind = TK_SEP_SEMI;
+      sval = ";";
       break;
 
     case '.':
-      tok.kind = TK_SEP_DOT;
-      strcpy (tok.sval, ".");
+      kind = TK_SEP_DOT;
+      sval = ".";
       break;
 
     case '+':
-      tok.kind = TK_OP_PLUS;
-      strcpy (tok.sval, "+");
+      kind = TK_OP_PLUS;
+      sval = "+";
       break;
 
     case '-':
-      tok.kind = TK_OP_MINUS;
-      strcpy (tok.sval, "-");
+      kind = TK_OP_MINUS;
+      sval = "-";
       break;
 
     case '*':
-      tok.kind = TK_OP_TIMES;
-      strcpy (tok.sval, "*");
+      kind = TK_OP_TIMES;
+      sval = "*";
       break;
 
     case '/':
-      tok.kind = TK_OP_DIV;
-      strcpy (tok.sval, "/");
+      kind = TK_OP_DIV;
+      sval = "/";
       break;
 
     case '=':
-      tok.kind = TK_OP_ASSIGN;
-      strcpy (tok.sval, "=");
+      kind = TK_OP_ASSIGN;
+      sval = "=";
       break;
 
     case '#':
-      tok.kind = TK_OP_SHARP;
-      strcpy (tok.sval, "#");
+      kind = TK_OP_SHARP;
+      sval = "#";
       break;
 
     case '<':
-      ch = fgetc (ctx.file);
-      if (ch != '=')
+      if ((ch = fgetc (file)) != '=')
         {
-          ungetc (ch, ctx.file);
-          tok.kind = TK_OP_LT;
-          strcpy (tok.sval, "<");
+          ungetc (ch, file);
+          kind = TK_OP_LT;
+          sval = "<";
         }
       else
         {
-          tok.kind = TK_OP_LTEQ;
-          strcpy (tok.sval, "<=");
+          kind = TK_OP_LTEQ;
+          sval = "<=";
         }
       break;
 
     case '>':
-      ch = fgetc (ctx.file);
-      if (ch != '=')
+      if ((ch = fgetc (file)) != '=')
         {
-          ungetc (ch, ctx.file);
-          tok.kind = TK_OP_GT;
-          strcpy (tok.sval, ">");
+          ungetc (ch, file);
+          kind = TK_OP_GT;
+          sval = ">";
         }
       else
         {
-          tok.kind = TK_OP_GTEQ;
-          strcpy (tok.sval, ">=");
+          kind = TK_OP_GTEQ;
+          sval = ">=";
         }
       break;
 
     case ':':
-      ch = fgetc (ctx.file);
-      if (ch != '=')
+      if ((ch = fgetc (file)) != '=')
         {
-          ungetc (ch, ctx.file);
-          tok.kind = TK_UNKNOW;
-          strcpy (tok.sval, ":");
+          ungetc (ch, file);
+          kind = TK_UNKNOW;
+          sval = ":";
         }
       else
         {
-          tok.kind = TK_OP_COLEQ;
-          strcpy (tok.sval, ":=");
+          kind = TK_OP_COLEQ;
+          sval = ":=";
         }
       break;
 
@@ -302,8 +283,11 @@ tok_next (void)
       tok.kind = TK_UNKNOW;
       tok.sval[0] = ch;
       tok.sval[1] = 0;
-      break;
+      goto end;
     }
+
+  strcpy (tok.sval, sval);
+  tok.kind = kind;
 
 end:
   return true;
