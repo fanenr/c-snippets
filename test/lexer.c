@@ -104,35 +104,36 @@ main (int argc, char **args)
       switch (tok.kind)
         {
         case TK_ID:
-          printf ("%d\t标识符\t\t%s\n", num, tok.sval);
+          printf ("%3d 标识符 %-24s", num, tok.sval);
           break;
 
         case TK_NUM:
-          printf ("%d\t常数\t\t%d\n", num, tok.ival);
+          printf ("%3d 常数   %-24d", num, tok.ival);
           break;
 
         case TK_UNKNOW:
-          printf ("%d\t非法\t\t%s\n", num, tok.sval);
+          printf ("%3d 非法   %-24s", num, tok.sval);
           break;
 
         case TK_OP_ST + 1 ... TK_OP_ED - 1:
-          printf ("%d\t运算符\t\t%s\n", num, tok.sval);
+          printf ("%3d 运算符 %-24s", num, tok.sval);
           break;
 
         case TK_KEY_ST + 1 ... TK_KEY_ED - 1:
-          printf ("%d\t保留字\t\t%s\n", num, tok.sval);
+          printf ("%3d 保留字 %-24s", num, tok.sval);
           break;
 
         case TK_SEP_ST + 1 ... TK_SEP_ED - 1:
-          printf ("%d\t界符\t\t%s\n", num, tok.sval);
+          printf ("%3d 界符   %-24s", num, tok.sval);
           if (end && tok.kind == TK_SEP_DOT)
             goto end;
           break;
 
         default:
-          error ("unkow type token");
+          error ("unknow type token");
         }
 
+      putchar (num % 2 ? '\t' : '\n');
       end = (tok.kind == TK_KEY_END);
     }
 
