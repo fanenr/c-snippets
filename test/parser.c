@@ -70,16 +70,13 @@ nullable (token_t *tok)
       if (tok != gen->left)
         continue;
 
-      bool can = true;
       for (token_t **ptr = gen->right, *curr; (curr = *ptr); ptr++)
         if (!nullable (curr))
-          {
-            can = false;
-            break;
-          }
+          goto next_gen;
+      return true;
 
-      if (can)
-        return true;
+    next_gen:
+      continue;
     }
 
   return false;
@@ -156,12 +153,12 @@ ret:
 }
 
 void
-follow_of (token_t *tok, token_t **result)
+follow_of (token_t *nt, token_t **result)
 {
   int num = 0;
   token_t *temp[8];
 
-  if (tok->kind == TOKEN_KIND_T || tok == &nt_S)
+  if (nt->kind == TOKEN_KIND_T || nt == &nt_S)
     goto ret;
 
   for (int i = 0; i < gens_size; i++)
@@ -170,19 +167,28 @@ follow_of (token_t *tok, token_t **result)
 
       for (token_t **ptr = gen->right, *curr; (curr = *ptr); ptr++)
         {
-          if (tok != curr)
+          if (nt != curr)
             continue;
 
-          token_t *next;
-          if (!(next = *(ptr + 1)))
-            break;
-
-          first_of (next, temp);
-          for (token_t **ptr = temp, *curr; (curr = *ptr); ptr++)
-            result[num++] = curr;
-
-          if (!nullable (next))
-            break;
+          for (token_t **pnext = ptr + 1;; pnext++)
+            {
+              token_t *next = *pnext;
+              if (next)
+                {
+                  first_of (next, temp);
+                  for (token_t **ptr = temp, *curr; (curr = *ptr); ptr++)
+                    result[num++] = curr;
+                  if (!nullable (next))
+                    break;
+                }
+              else
+                {
+                  follow_of (gen->left, temp);
+                  for (token_t **ptr = temp, *curr; (curr = *ptr); ptr++)
+                    result[num++] = curr;
+                  break;
+                }
+            }
         }
     }
 
@@ -190,8 +196,9 @@ ret:
   result[num] = NULL;
 }
 
+/* get next prediction production */
 gen_t *
-gen_of (token_t *left, token_t *tok)
+gen_of (token_t *nt, token_t *tok)
 {
   token_t *first[16];
   token_t *follow[8];
@@ -199,7 +206,7 @@ gen_of (token_t *left, token_t *tok)
   for (int i = 0; i < gens_size; i++)
     {
       gen_t *gen = &gens[i];
-      if (left != gen->left)
+      if (nt != gen->left)
         continue;
 
       first_of2 (gen->right, first);
@@ -210,7 +217,7 @@ gen_of (token_t *left, token_t *tok)
       if (!nullable2 (gen->right))
         continue;
 
-      follow_of (left, follow);
+      follow_of (nt, follow);
       for (token_t **ptr = follow, *curr; (curr = *ptr); ptr++)
         if (tok == curr)
           return gen;
@@ -245,8 +252,39 @@ token_next (void)
   exit (1);
 }
 
-int
-main (void)
+struct
+{
+  int size;
+  token_t *toks[24];
+} stack;
+
+void
+stack_push (token_t *tok)
+{
+  stack.toks[stack.size++] = tok;
+}
+
+token_t *
+stack_top (void)
+{
+  return stack.size ? stack.toks[stack.size - 1] : NULL;
+}
+
+void
+stack_pop (void)
+{
+  if (stack.size > 0)
+    stack.toks[--stack.size] = NULL;
+}
+
+void
+stack_clear (void)
+{
+  stack.size = 0;
+}
+
+void
+print_info (void)
 {
   token_t *first[16];
   token_t *follow[8];
@@ -306,5 +344,60 @@ main (void)
           printf ("%-10s", gen ? gen->sval : "");
         }
       printf ("\n");
+    }
+  printf ("\n");
+}
+
+int
+main (void)
+{
+  print_info ();
+
+  token_t *tok = token_next ();
+  stack_push (&nt_S);
+
+  for (;;)
+    {
+      token_t *top = stack_top ();
+
+      if (top->kind == TOKEN_KIND_T)
+        {
+          if (tok != top)
+            {
+              printf ("syntax error\n");
+              return 1;
+            }
+
+          stack_pop ();
+          tok = token_next ();
+          if (!stack.size)
+            {
+              printf ("parse ok\n");
+              return 0;
+            }
+          continue;
+        }
+
+      gen_t *gen = gen_of (top, tok);
+
+      if (!gen)
+        {
+          printf ("syntax error\n");
+          return 1;
+        }
+
+      token_t **right = gen->right;
+      int right_size = 0;
+      stack_pop ();
+
+      for (; right[right_size]; right_size++)
+        ;
+
+      for (; right_size > 0;)
+        {
+          token_t *push = right[--right_size];
+          if (push != &t_null)
+            stack_push (push);
+        }
     }
 }
