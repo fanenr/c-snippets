@@ -1,7 +1,6 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define error(FMT, ...)                                                       \
@@ -9,7 +8,7 @@
     {                                                                         \
       fprintf (stderr, FMT, ##__VA_ARGS__);                                   \
       fprintf (stderr, "\n");                                                 \
-      exit (1);                                                               \
+      __builtin_trap ();                                                      \
     }                                                                         \
   while (0)
 
