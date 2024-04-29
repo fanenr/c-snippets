@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 enum
 {
@@ -19,7 +20,7 @@ enum
   TOKEN_T_ED,
 };
 
-typedef struct gen_t gen_t;
+typedef struct prod_t prod_t;
 typedef struct token_t token_t;
 
 struct token_t
@@ -28,7 +29,7 @@ struct token_t
   const char *sval;
 };
 
-struct gen_t
+struct prod_t
 {
   int rsize;
   token_t *left;
@@ -62,39 +63,29 @@ token_t *ts[] = { &t_a, &t_d, &t_e, &t_b, &t_p };
 int ts_size = sizeof (ts) / sizeof (ts[0]);
 
 /* productions */
-gen_t g_s = { .rsize = 3,
-              .left = &nt_S,
-              .sval = "S->aH#",
-              .right = (token_t *[]){ &t_a, &nt_H, &t_p } };
+token_t *rg_s[] = { &t_a, &nt_H, &t_p };
+prod_t g_s = { .rsize = 3, .left = &nt_S, .sval = "S->aH#", .right = rg_s };
 
-gen_t g_h1 = { .rsize = 3,
-               .left = &nt_H,
-               .sval = "H->aMd",
-               .right = (token_t *[]){ &t_a, &nt_M, &t_d } };
+token_t *rg_h1[] = { &t_a, &nt_M, &t_d };
+prod_t g_h1 = { .rsize = 3, .left = &nt_H, .sval = "H->aMd", .right = rg_h1 };
 
-gen_t g_h2 = {
-  .rsize = 1, .left = &nt_H, .sval = "H->d", .right = (token_t *[]){ &t_d }
-};
+token_t *rg_h2[] = { &t_d };
+prod_t g_h2 = { .rsize = 1, .left = &nt_H, .sval = "H->d", .right = rg_h2 };
 
-gen_t g_m1 = { .rsize = 2,
-               .left = &nt_M,
-               .sval = "M->Ab",
-               .right = (token_t *[]){ &nt_A, &t_b } };
+token_t *rg_m1[] = { &nt_A, &t_b };
+prod_t g_m1 = { .rsize = 2, .left = &nt_M, .sval = "M->Ab", .right = rg_m1 };
 
-gen_t g_m2
-    = { .rsize = 0, .left = &nt_M, .sval = "M->", .right = (token_t *[]){} };
+token_t *rg_m2[] = { NULL };
+prod_t g_m2 = { .rsize = 0, .left = &nt_M, .sval = "M->", .right = rg_m2 };
 
-gen_t g_a1 = { .rsize = 2,
-               .left = &nt_A,
-               .sval = "A->aM",
-               .right = (token_t *[]){ &t_a, &nt_M } };
+token_t *rg_a1[] = { &t_a, &nt_M };
+prod_t g_a1 = { .rsize = 2, .left = &nt_A, .sval = "A->aM", .right = rg_a1 };
 
-gen_t g_a2 = {
-  .rsize = 1, .left = &nt_A, .sval = "A->e", .right = (token_t *[]){ &t_e }
-};
+token_t *rg_a2[] = { &t_e };
+prod_t g_a2 = { .rsize = 1, .left = &nt_A, .sval = "A->e", .right = rg_a2 };
 
-gen_t *gens[] = { &g_s, &g_h1, &g_h2, &g_m1, &g_m2, &g_a1, &g_a2 };
-int gens_size = sizeof (gens) / sizeof (gens[0]);
+prod_t *prods[] = { &g_s, &g_h1, &g_h2, &g_m1, &g_m2, &g_a1, &g_a2 };
+int prods_size = sizeof (prods) / sizeof (prods[0]);
 
 /* print first, follow sets and LL(1) prediction table */
 void print_info (void);
@@ -103,7 +94,7 @@ void print_info (void);
 token_t *token_next (void);
 
 /* check whether a production is nullable */
-bool nullable2 (gen_t *gen);
+bool nullable2 (prod_t *prod);
 
 /* check whether a token is nullable */
 bool nullable (token_t *nt);
@@ -112,13 +103,13 @@ bool nullable (token_t *nt);
 void first_of (token_t *tok, token_t **result);
 
 /* get the first set of a production */
-void first_of2 (gen_t *gen, token_t **result);
+void first_of2 (prod_t *prod, token_t **result);
 
 /* get the follow set of a non-terminal token */
 void follow_of (token_t *nt, token_t **result);
 
 /* get the next production according to nt and tok */
-gen_t *gen_of (token_t *nt, token_t *tok);
+prod_t *prod_of (token_t *nt, token_t *tok);
 
 #define TOKEN_IS_T(TOK) (TOKEN_T_ST < (TOK)->kind && (TOK)->kind < TOKEN_T_ED)
 
@@ -162,7 +153,7 @@ main (void)
         {
           if (tok != top)
             {
-              printf ("syntax error\n");
+              printf ("syntax error\n\n");
               RESET ();
               continue;
             }
@@ -170,7 +161,7 @@ main (void)
           STACK_POP ();
           if (!stack.size)
             {
-              printf ("parse ok\n");
+              printf ("parse ok\n\n");
               RESET ();
               continue;
             }
@@ -179,17 +170,17 @@ main (void)
           continue;
         }
 
-      gen_t *gen;
+      prod_t *prod;
       STACK_POP ();
-      if (!(gen = gen_of (top, tok)))
+      if (!(prod = prod_of (top, tok)))
         {
-          printf ("syntax error\n");
+          printf ("syntax error\n\n");
           RESET ();
           continue;
         }
 
-      for (int i = gen->rsize - 1; i >= 0; i--)
-        STACK_PUSH (gen->right[i]);
+      for (int i = prod->rsize - 1; i >= 0; i--)
+        STACK_PUSH (prod->right[i]);
     }
 }
 
@@ -208,27 +199,27 @@ print_info (void)
 
       printf ("\t\t");
       first_of (nt, first);
-      for (token_t **ptr = first, *curr; (curr = *ptr); ptr++)
-        printf ("%s ", curr->sval);
+      for (token_t **ptr = first; *ptr; ptr++)
+        printf ("%s ", (*ptr)->sval);
 
       printf ("\t\t");
       follow_of (nt, follow);
-      for (token_t **ptr = follow, *curr; (curr = *ptr); ptr++)
-        printf ("%s ", curr->sval);
+      for (token_t **ptr = follow; *ptr; ptr++)
+        printf ("%s ", (*ptr)->sval);
       puts ("");
     }
 
   printf ("\n%-16sfirst\n", "production");
   puts ("---------------------");
-  for (int i = 0; i < gens_size; i++)
+  for (int i = 0; i < prods_size; i++)
     {
-      gen_t *gen = gens[i];
-      token_t **toks = gen->right;
-      printf ("%-16s", gen->sval);
+      prod_t *prod = prods[i];
+      token_t **toks = prod->right;
+      printf ("%-16s", prod->sval);
 
-      first_of2 (gen, first);
-      for (token_t **ptr = first, *curr; (curr = *ptr); ptr++)
-        printf ("%s ", curr->sval);
+      first_of2 (prod, first);
+      for (token_t **ptr = first; *ptr; ptr++)
+        printf ("%s ", (*ptr)->sval);
       puts ("");
     }
 
@@ -243,8 +234,8 @@ print_info (void)
       printf ("%-4s", nt->sval);
       for (int j = 0; j < ts_size; j++)
         {
-          gen_t *gen = gen_of (nt, ts[j]);
-          printf ("%-10s", gen ? gen->sval : "");
+          prod_t *prod = prod_of (nt, ts[j]);
+          printf ("%-10s", prod ? prod->sval : "");
         }
       puts ("");
     }
@@ -257,13 +248,13 @@ nullable (token_t *nt)
   if (TOKEN_IS_T (nt))
     return false;
 
-  for (int i = 0; i < gens_size; i++)
+  for (int i = 0; i < prods_size; i++)
     {
-      gen_t *gen = gens[i];
-      if (nt != gen->left)
+      prod_t *prod = prods[i];
+      if (nt != prod->left)
         continue;
 
-      if (nullable2 (gen))
+      if (nullable2 (prod))
         return true;
     }
 
@@ -271,10 +262,10 @@ nullable (token_t *nt)
 }
 
 bool
-nullable2 (gen_t *gen)
+nullable2 (prod_t *prod)
 {
-  for (int i = 0; i < gen->rsize; i++)
-    if (!nullable (gen->right[i]))
+  for (int i = 0; i < prod->rsize; i++)
+    if (!nullable (prod->right[i]))
       return false;
   return true;
 }
@@ -290,15 +281,15 @@ first_of (token_t *tok, token_t **result)
       goto ret;
     }
 
-  for (int i = 0; i < gens_size; i++)
+  for (int i = 0; i < prods_size; i++)
     {
-      gen_t *gen = gens[i];
-      if (tok != gen->left)
+      prod_t *prod = prods[i];
+      if (tok != prod->left)
         continue;
 
-      for (int i = 0; i < gen->rsize; i++)
+      for (int i = 0; i < prod->rsize; i++)
         {
-          token_t *r = gen->right[i];
+          token_t *r = prod->right[i];
           first_of (r, temp);
 
           for (token_t **ptr = temp; *ptr; ptr++)
@@ -313,14 +304,14 @@ ret:
 }
 
 void
-first_of2 (gen_t *gen, token_t **result)
+first_of2 (prod_t *prod, token_t **result)
 {
   int num = 0;
   token_t *temp[8];
 
-  for (int i = 0; i < gen->rsize; i++)
+  for (int i = 0; i < prod->rsize; i++)
     {
-      token_t *r = gen->right[i];
+      token_t *r = prod->right[i];
       first_of (r, temp);
 
       for (token_t **ptr = temp; *ptr; ptr++)
@@ -341,26 +332,26 @@ follow_of (token_t *nt, token_t **result)
   if (TOKEN_IS_T (nt))
     goto ret;
 
-  for (int i = 0; i < gens_size; i++)
+  for (int i = 0; i < prods_size; i++)
     {
-      gen_t *gen = gens[i];
+      prod_t *prod = prods[i];
 
-      for (int i = 0; i < gen->rsize; i++)
+      for (int i = 0; i < prod->rsize; i++)
         {
-          if (nt != gen->right[i])
+          if (nt != prod->right[i])
             continue;
 
-          for (int j = i + 1; j < gen->rsize + 1; j++)
+          for (int j = i + 1; j < prod->rsize + 1; j++)
             {
-              if (j == gen->rsize)
+              if (j == prod->rsize)
                 {
-                  follow_of (gen->left, temp);
+                  follow_of (prod->left, temp);
                   for (token_t **ptr = temp; *ptr; ptr++)
                     result[num++] = *ptr;
                   break;
                 }
 
-              token_t *next = gen->right[j];
+              token_t *next = prod->right[j];
               first_of (next, temp);
 
               for (token_t **ptr = temp; *ptr; ptr++)
@@ -375,30 +366,30 @@ ret:
   result[num] = NULL;
 }
 
-gen_t *
-gen_of (token_t *nt, token_t *tok)
+prod_t *
+prod_of (token_t *nt, token_t *tok)
 {
   token_t *first[16];
   token_t *follow[8];
 
-  for (int i = 0; i < gens_size; i++)
+  for (int i = 0; i < prods_size; i++)
     {
-      gen_t *gen = gens[i];
-      if (nt != gen->left)
+      prod_t *prod = prods[i];
+      if (nt != prod->left)
         continue;
 
-      first_of2 (gen, first);
+      first_of2 (prod, first);
       for (token_t **ptr = first; *ptr; ptr++)
         if (tok == *ptr)
-          return gen;
+          return prod;
 
-      if (!nullable2 (gen))
+      if (!nullable2 (prod))
         continue;
 
       follow_of (nt, follow);
       for (token_t **ptr = follow; *ptr; ptr++)
         if (tok == *ptr)
-          return gen;
+          return prod;
     }
 
   return NULL;
@@ -424,5 +415,5 @@ token_next (void)
       return &t_b;
     }
   printf ("unknown token %c\n", ch);
-  __builtin_trap ();
+  exit (1);
 }
