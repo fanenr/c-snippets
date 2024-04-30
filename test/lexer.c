@@ -1,3 +1,12 @@
+/* README
+ *
+ * Although I have removed all language extensions for compatibility and only
+ * use standard C, by all means compile with GCC if possible. Furthermore, the
+ * files are encoded in UTF-8, so files garble is not my problem.
+ */
+
+/* build and run: gcc lexer.c && ./a.out test.txt */
+
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
