@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define error(FMT, ...)                                                       \
@@ -8,7 +9,7 @@
     {                                                                         \
       fprintf (stderr, FMT, ##__VA_ARGS__);                                   \
       fprintf (stderr, "\n");                                                 \
-      __builtin_trap ();                                                      \
+      exit (1);                                                               \
     }                                                                         \
   while (0)
 
@@ -56,6 +57,10 @@ enum
   TK_SEP_ED,
 };
 
+#define TK_IS_OP(KIND) (TK_OP_ST < (KIND) && (KIND) < TK_OP_ED)
+#define TK_IS_KEY(KIND) (TK_KEY_ST < (KIND) && (KIND) < TK_KEY_ED)
+#define TK_IS_SEP(KIND) (TK_SEP_ST < (KIND) && (KIND) < TK_SEP_ED)
+
 const char *tk_keys[] = {
   [TK_KEY_IF] = "if",       [TK_KEY_DO] = "do",
   [TK_KEY_VAR] = "var",     [TK_KEY_ODD] = "odd",
@@ -93,14 +98,14 @@ main (int argc, char **args)
   if (!(ctx.file = fopen (args[1], "r")))
     error ("can not open file %s", args[1]);
 
-  bool end;
+  int kind;
   int num = 0;
 
   while (tok_next ())
     {
       num++;
 
-      switch (tok.kind)
+      switch ((kind = tok.kind))
         {
         case TK_ID:
           printf ("%3d 标识符 %-24s", num, tok.sval);
@@ -114,26 +119,18 @@ main (int argc, char **args)
           printf ("%3d 非法   %-24s", num, tok.sval);
           break;
 
-        case TK_OP_ST + 1 ... TK_OP_ED - 1:
-          printf ("%3d 运算符 %-24s", num, tok.sval);
-          break;
-
-        case TK_KEY_ST + 1 ... TK_KEY_ED - 1:
-          printf ("%3d 保留字 %-24s", num, tok.sval);
-          break;
-
-        case TK_SEP_ST + 1 ... TK_SEP_ED - 1:
-          printf ("%3d 界符   %-24s", num, tok.sval);
-          if (end && tok.kind == TK_SEP_DOT)
-            goto end;
-          break;
-
         default:
-          error ("unknow type token");
+          if (TK_IS_OP (kind))
+            printf ("%3d 运算符 %-24s", num, tok.sval);
+          else if (TK_IS_KEY (kind))
+            printf ("%3d 保留字 %-24s", num, tok.sval);
+          else if (TK_IS_SEP (kind))
+            printf ("%3d 界符   %-24s", num, tok.sval);
+          else
+            error ("unknow type token");
         }
 
       putchar (num % 2 ? '\t' : '\n');
-      end = (tok.kind == TK_KEY_END);
     }
 
 end:
