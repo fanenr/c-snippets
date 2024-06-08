@@ -1,5 +1,7 @@
 #include "apue.h"
+
 #include <dirent.h>
+#include <stdio.h>
 
 int
 main (int argc, char **argv)

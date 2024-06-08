@@ -1,14 +1,15 @@
 #ifndef ASSIST_H
 #define ASSIST_H
+
 #include <semaphore.h>
 #include <sys/select.h>
 
 struct sockaddr;
 typedef struct sockaddr SA;
 
-#define THREADS (4)
-#define BUFSIZE (16)
-#define MAXLINE (64)
+#define THREADS 4
+#define BUFSIZE 16
+#define MAXLINE 64
 
 /* on success, return value is a file descriptor, on failure, -1 is returned */
 extern int open_client_fd (char *restrict host, char *restrict port);
