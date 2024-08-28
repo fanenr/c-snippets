@@ -11,6 +11,9 @@ static void cleanup (void);
 static void work (const char *path);
 
 static FILE *result;
+static FILE *models;
+static CURLM *multi;
+static bool got_models;
 
 int
 main (int argc, char **argv)
@@ -24,10 +27,15 @@ static void
 init (void)
 {
   curl_global_init (CURL_GLOBAL_ALL);
+  multi = curl_multi_init ();
+  assert (multi);
 
   remove ("./result");
+  remove ("./models");
+
   result = fopen ("./result", "a");
-  assert (result);
+  models = fopen ("./models", "w");
+  assert (result && models);
 
   fputs ("key, name, balance\n", result);
 }
@@ -35,71 +43,66 @@ init (void)
 static void
 cleanup (void)
 {
-  curl_global_cleanup ();
+  fclose (models);
   fclose (result);
+
+  curl_multi_cleanup (multi);
+  curl_global_cleanup ();
 }
 
 static size_t
 get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
 {
   size_t total = size * nmemb;
-  bool *ret = ptr;
-
-  FILE *file = fopen ("./models", "w");
-  assert (file);
-
   json_t *json = json_loadb (data, total, 0, NULL);
 
   if (json)
     {
+      fprintf (models, "%s\n", (const char *)ptr);
       json_t *arr = json_object_get (json, "data");
       for (size_t n = json_array_size (arr), i = 0; i < n; i++)
         {
           json_t *item = json_array_get (arr, i);
           json_t *id = json_object_get (item, "id");
-          fputs (json_string_value (id), file);
-          fputc ('\n', file);
+          fputs (json_string_value (id), models);
+          fputc ('\n', models);
         }
-      *ret = true;
+      got_models = true;
     }
-  else
-    *ret = false;
 
   json_decref (json);
-  fclose (file);
   return total;
 }
 
-static bool
+static void
 get_models (const char *key)
 {
-  bool ret;
   CURL *hnd = curl_easy_init ();
 
-  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
-  curl_easy_setopt (hnd, CURLOPT_URL, "https://api.siliconflow.cn/v1/models");
+#define URL_MODELS "https://api.siliconflow.cn/v1/models"
 
-  static char key_hdr[78] = "authorization: Bearer ";
-  strcpy (key_hdr + 22, key);
+  curl_easy_setopt (hnd, CURLOPT_URL, URL_MODELS);
+  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
+
+  static char hdr_key[78];
+  sprintf (hdr_key, "authorization: Bearer %s", key);
 
   struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, key_hdr);
+  hdrs = curl_slist_append (hdrs, hdr_key);
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, &ret);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, key);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_models_cb);
 
   curl_easy_perform (hnd);
   curl_easy_cleanup (hnd);
-  return ret;
 }
 
 static size_t
 get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
 {
   size_t total = size * nmemb;
-
   json_t *json = json_loadb (data, total, 0, NULL);
 
   if (json)
@@ -122,23 +125,23 @@ get_info (const char *key)
 {
   CURL *hnd = curl_easy_init ();
 
-  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
-  curl_easy_setopt (hnd, CURLOPT_URL,
-                    "https://api.siliconflow.cn/v1/user/info");
+#define URL_INFO "https://api.siliconflow.cn/v1/user/info"
 
-  static char key_hdr[78] = "authorization: Bearer ";
-  strcpy (key_hdr + 22, key);
+  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
+  curl_easy_setopt (hnd, CURLOPT_URL, URL_INFO);
+
+  static char hdr_key[78];
+  sprintf (hdr_key, "authorization: Bearer %s", key);
 
   struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, key_hdr);
+  hdrs = curl_slist_append (hdrs, hdr_key);
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
   curl_easy_setopt (hnd, CURLOPT_WRITEDATA, key);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_info_cb);
 
-  CURLcode ret = curl_easy_perform (hnd);
-  curl_easy_cleanup (hnd);
+  curl_multi_add_handle (multi, hnd);
 }
 
 static void
@@ -146,8 +149,6 @@ work (const char *path)
 {
   FILE *file = fopen (path, "r");
   assert (file);
-
-  bool got_models = false;
 
   for (char key[64]; fgets (key, sizeof (key), file);)
     {
@@ -157,8 +158,31 @@ work (const char *path)
       key[strlen (key) - 1] = '\0';
 
       if (!got_models)
-        got_models = get_models (key);
+        get_models (key);
 
       get_info (key);
+    }
+
+  for (int run = 1; run;)
+    {
+      CURLMcode code = curl_multi_perform (multi, &run);
+      assert (code == CURLM_OK);
+      curl_multi_poll (multi, NULL, 0, 1000, NULL);
+
+      int msgq;
+      struct CURLMsg *msg;
+
+      do
+        {
+          if (!(msg = curl_multi_info_read (multi, &msgq)))
+            break;
+
+          if (msg->msg != CURLMSG_DONE)
+            continue;
+
+          curl_multi_remove_handle (multi, msg->easy_handle);
+          curl_easy_cleanup (msg->easy_handle);
+        }
+      while (msg);
     }
 }
