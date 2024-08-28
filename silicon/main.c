@@ -45,15 +45,16 @@ cleanup (void)
 {
   fclose (models);
   fclose (result);
-
-  curl_multi_cleanup (multi);
-  curl_global_cleanup ();
 }
 
 static size_t
 get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
 {
   size_t total = size * nmemb;
+
+  if (got_models)
+    return total;
+
   json_t *json = json_loadb (data, total, 0, NULL);
 
   if (json)
@@ -70,7 +71,6 @@ get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
       got_models = true;
     }
 
-  json_decref (json);
   return total;
 }
 
@@ -84,19 +84,19 @@ get_models (const char *key)
   curl_easy_setopt (hnd, CURLOPT_URL, URL_MODELS);
   curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
 
-  static char hdr_key[78];
+  static char hdr_key[80];
   sprintf (hdr_key, "authorization: Bearer %s", key);
 
   struct curl_slist *hdrs = NULL;
   hdrs = curl_slist_append (hdrs, hdr_key);
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, key);
+  char *dup = strdup (key);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, dup);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_models_cb);
 
-  curl_easy_perform (hnd);
-  curl_easy_cleanup (hnd);
+  curl_multi_add_handle (multi, hnd);
 }
 
 static size_t
@@ -116,7 +116,6 @@ get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
   else
     fprintf (result, "%s, , \n", (const char *)ptr);
 
-  json_decref (json);
   return total;
 }
 
@@ -130,14 +129,15 @@ get_info (const char *key)
   curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
   curl_easy_setopt (hnd, CURLOPT_URL, URL_INFO);
 
-  static char hdr_key[78];
+  static char hdr_key[80];
   sprintf (hdr_key, "authorization: Bearer %s", key);
 
   struct curl_slist *hdrs = NULL;
   hdrs = curl_slist_append (hdrs, hdr_key);
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, key);
+  char *dup = strdup (key);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, dup);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_info_cb);
 
@@ -157,9 +157,7 @@ work (const char *path)
 
       key[strlen (key) - 1] = '\0';
 
-      if (!got_models)
-        get_models (key);
-
+      get_models (key);
       get_info (key);
     }
 
@@ -181,7 +179,6 @@ work (const char *path)
             continue;
 
           curl_multi_remove_handle (multi, msg->easy_handle);
-          curl_easy_cleanup (msg->easy_handle);
         }
       while (msg);
     }
