@@ -45,21 +45,38 @@ cleanup (void)
 {
   fclose (models);
   fclose (result);
+  curl_multi_cleanup (&multi);
+  curl_global_cleanup ();
 }
 
-static size_t
-get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
+enum
 {
-  size_t total = size * nmemb;
+  TYPE_MODELS,
+  TYPE_INFO,
+};
 
-  if (got_models)
-    return total;
+typedef struct pack_t pack_t;
 
-  json_t *json = json_loadb (data, total, 0, NULL);
+struct pack_t
+{
+  int type;  /* query type */
+  char *key; /* from strdup */
+
+  char *data;  /* from cb  */
+  size_t size; /* from cb  */
+
+  CURL *hnd;
+  struct curl_slist *hdrs;
+};
+
+static void
+get_models_hnd (pack_t *pack)
+{
+  json_t *json = json_loadb (pack->data, pack->size, 0, NULL);
 
   if (json)
     {
-      fprintf (models, "%s\n", (const char *)ptr);
+      fprintf (models, "%s\n", pack->key);
       json_t *arr = json_object_get (json, "data");
       for (size_t n = json_array_size (arr), i = 0; i < n; i++)
         {
@@ -69,7 +86,26 @@ get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
           fputc ('\n', models);
         }
       got_models = true;
+      json_decref (json);
     }
+}
+
+static size_t
+get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
+{
+  pack_t *pack = ptr;
+  size_t total = size * nmemb;
+
+  if (got_models)
+    return total;
+
+  size_t oldsize = pack->size;
+  size_t newsize = oldsize + total;
+  char *newdata = realloc (pack->data, newsize);
+
+  memcpy (newdata + oldsize, data, total);
+  pack->size = newsize;
+  pack->data = newdata;
 
   return total;
 }
@@ -78,6 +114,7 @@ static void
 get_models (const char *key)
 {
   CURL *hnd = curl_easy_init ();
+  pack_t *pack = malloc (sizeof (pack_t));
 
 #define URL_MODELS "https://api.siliconflow.cn/v1/models"
 
@@ -92,18 +129,27 @@ get_models (const char *key)
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
   char *dup = strdup (key);
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, dup);
+  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_models_cb);
 
   curl_multi_add_handle (multi, hnd);
+
+  pack->key = dup;
+  pack->type = TYPE_MODELS;
+
+  pack->size = 0;
+  pack->data = NULL;
+
+  pack->hnd = hnd;
+  pack->hdrs = hdrs;
 }
 
-static size_t
-get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
+static void
+get_info_hnd (pack_t *pack)
 {
-  size_t total = size * nmemb;
-  json_t *json = json_loadb (data, total, 0, NULL);
+  json_t *json = json_loadb (pack->data, pack->size, 0, NULL);
 
   if (json)
     {
@@ -111,10 +157,26 @@ get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
       const char *name = json_string_value (json_object_get (obj, "name"));
       const char *balance
           = json_string_value (json_object_get (obj, "balance"));
-      fprintf (result, "%s, %s, %s\n", (const char *)ptr, name, balance);
+      fprintf (result, "%s, %s, %s\n", pack->key, name, balance);
+      json_decref (json);
     }
   else
-    fprintf (result, "%s, , \n", (const char *)ptr);
+    fprintf (result, "%s, , \n", pack->key);
+}
+
+static size_t
+get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
+{
+  pack_t *pack = ptr;
+  size_t total = size * nmemb;
+
+  size_t oldsize = pack->size;
+  size_t newsize = oldsize + total;
+  char *newdata = realloc (pack->data, newsize);
+
+  memcpy (newdata + oldsize, data, total);
+  pack->size = newsize;
+  pack->data = newdata;
 
   return total;
 }
@@ -123,6 +185,7 @@ static void
 get_info (const char *key)
 {
   CURL *hnd = curl_easy_init ();
+  pack_t *pack = malloc (sizeof (pack_t));
 
 #define URL_INFO "https://api.siliconflow.cn/v1/user/info"
 
@@ -137,11 +200,21 @@ get_info (const char *key)
   hdrs = curl_slist_append (hdrs, "accept: application/json");
 
   char *dup = strdup (key);
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, dup);
+  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
   curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_info_cb);
 
   curl_multi_add_handle (multi, hnd);
+
+  pack->key = dup;
+  pack->type = TYPE_INFO;
+
+  pack->size = 0;
+  pack->data = NULL;
+
+  pack->hnd = hnd;
+  pack->hdrs = hdrs;
 }
 
 static void
@@ -161,25 +234,36 @@ work (const char *path)
       get_info (key);
     }
 
-  for (int run = 1; run;)
+  for (int n = 1, r; n;)
     {
-      CURLMcode code = curl_multi_perform (multi, &run);
-      assert (code == CURLM_OK);
+      CURLMcode code = curl_multi_perform (multi, &n);
+
       curl_multi_poll (multi, NULL, 0, 1000, NULL);
 
-      int msgq;
-      struct CURLMsg *msg;
+      for (struct CURLMsg *m; (m = curl_multi_info_read (multi, &r));)
+        if (m->msg == CURLMSG_DONE)
+          {
+            long code;
+            pack_t *pack;
+            CURL *hnd = m->easy_handle;
+            curl_easy_getinfo (hnd, CURLINFO_PRIVATE, &pack);
+            curl_easy_getinfo (hnd, CURLINFO_RESPONSE_CODE, &code);
 
-      do
-        {
-          if (!(msg = curl_multi_info_read (multi, &msgq)))
-            break;
+            if (code != 200)
+              continue;
 
-          if (msg->msg != CURLMSG_DONE)
-            continue;
+            if (pack->type == TYPE_MODELS && !got_models)
+              get_models_hnd (pack);
+            else if (pack->type == TYPE_INFO)
+              get_info_hnd (pack);
 
-          curl_multi_remove_handle (multi, msg->easy_handle);
-        }
-      while (msg);
+            curl_slist_free_all (pack->hdrs);
+            free (pack->data);
+            free (pack->key);
+            free (pack);
+
+            curl_multi_remove_handle (multi, m->easy_handle);
+            curl_easy_cleanup (hnd);
+          }
     }
 }
