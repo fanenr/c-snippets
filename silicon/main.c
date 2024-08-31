@@ -7,6 +7,8 @@
 
 enum
 {
+  TYPE_CHAT_ADVANCED,
+  TYPE_CHAT_BASE,
   TYPE_MODELS,
   TYPE_INFO,
 };
@@ -20,6 +22,9 @@ struct result_t
   char key[55];
   char name[12];
   char balance[16];
+
+  bool base;
+  bool advanced;
 };
 
 struct pack_t
@@ -39,6 +44,8 @@ static void work (const char *path);
 
 static CURLM *multi;
 static bool got_models;
+static char *chat_base_data;
+static char *chat_advanced_data;
 
 int
 main (int argc, char **argv)
@@ -53,13 +60,49 @@ init (void)
 {
   curl_global_init (CURL_GLOBAL_ALL);
   multi = curl_multi_init ();
+
+  json_t *base
+      = json_pack ("{s:s,s:[{s:s,s:s}]}", "model", "Qwen/Qwen2-72B-Instruct",
+                   "messages", "role", "user", "content", "AI 是什么？");
+  json_t *advanced
+      = json_pack ("{s:s,s:[{s:s,s:s}]}", "model",
+                   "meta-llama/Meta-Llama-3.1-405B-Instruct", "messages",
+                   "role", "user", "content", "AI 是什么？");
+
+  chat_base_data = json_dumps (base, 0);
+  chat_advanced_data = json_dumps (advanced, 0);
+
+  json_decref (base);
+  json_decref (advanced);
 }
 
 static void
 cleanup (void)
 {
+  free (chat_advanced_data);
+  free (chat_base_data);
   curl_multi_cleanup (&multi);
   curl_global_cleanup ();
+}
+
+static size_t
+callback (char *data, size_t size, size_t nmemb, void *ptr)
+{
+  pack_t *pack = ptr;
+  size_t total = size * nmemb;
+
+  if (pack->type == TYPE_MODELS && got_models)
+    return total;
+
+  size_t oldsize = pack->size;
+  size_t newsize = oldsize + total;
+  char *newdata = realloc (pack->data, newsize);
+
+  memcpy (newdata + oldsize, data, total);
+  pack->size = newsize;
+  pack->data = newdata;
+
+  return total;
 }
 
 static void
@@ -85,26 +128,6 @@ get_models_hnd (pack_t *pack)
     }
 }
 
-static size_t
-get_models_cb (char *data, size_t size, size_t nmemb, void *ptr)
-{
-  pack_t *pack = ptr;
-  size_t total = size * nmemb;
-
-  if (got_models)
-    return total;
-
-  size_t oldsize = pack->size;
-  size_t newsize = oldsize + total;
-  char *newdata = realloc (pack->data, newsize);
-
-  memcpy (newdata + oldsize, data, total);
-  pack->size = newsize;
-  pack->data = newdata;
-
-  return total;
-}
-
 static void
 get_models (result_t *res)
 {
@@ -126,7 +149,7 @@ get_models (result_t *res)
   curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
   curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
-  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_models_cb);
+  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
 
   curl_multi_add_handle (multi, hnd);
 
@@ -158,23 +181,6 @@ get_info_hnd (pack_t *pack)
     }
 }
 
-static size_t
-get_info_cb (char *data, size_t size, size_t nmemb, void *ptr)
-{
-  pack_t *pack = ptr;
-  size_t total = size * nmemb;
-
-  size_t oldsize = pack->size;
-  size_t newsize = oldsize + total;
-  char *newdata = realloc (pack->data, newsize);
-
-  memcpy (newdata + oldsize, data, total);
-  pack->size = newsize;
-  pack->data = newdata;
-
-  return total;
-}
-
 static void
 get_info (result_t *res)
 {
@@ -196,7 +202,7 @@ get_info (result_t *res)
   curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
   curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
-  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, get_info_cb);
+  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
 
   curl_multi_add_handle (multi, hnd);
 
@@ -207,6 +213,79 @@ get_info (result_t *res)
   pack->data = NULL;
 
   pack->hdrs = hdrs;
+}
+
+static inline void
+chat_hnd (pack_t *pack)
+{
+  switch (pack->type)
+    {
+    case TYPE_CHAT_BASE:
+      pack->res->base = true;
+      break;
+    case TYPE_CHAT_ADVANCED:
+      pack->res->advanced = true;
+      break;
+    }
+}
+
+static void
+chat (result_t *res, int type)
+{
+  CURL *hnd = curl_easy_init ();
+  pack_t *pack = malloc (sizeof (pack_t));
+
+#define URL_CHAT "https://api.siliconflow.cn/v1/chat/completions"
+
+  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "POST");
+  curl_easy_setopt (hnd, CURLOPT_URL, URL_CHAT);
+
+  const char *data;
+  static char hdr_key[80];
+  sprintf (hdr_key, "authorization: Bearer %s", res->key);
+
+  switch (type)
+    {
+    case TYPE_CHAT_BASE:
+      data = chat_base_data;
+      break;
+    case TYPE_CHAT_ADVANCED:
+      data = chat_advanced_data;
+      break;
+    }
+
+  struct curl_slist *hdrs = NULL;
+  hdrs = curl_slist_append (hdrs, hdr_key);
+  hdrs = curl_slist_append (hdrs, "accept: application/json");
+  hdrs = curl_slist_append (hdrs, "content-type: application/json");
+
+  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
+  curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
+  curl_easy_setopt (hnd, CURLOPT_POSTFIELDS, data);
+  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
+
+  curl_multi_add_handle (multi, hnd);
+
+  pack->res = res;
+  pack->type = type;
+
+  pack->size = 0;
+  pack->data = NULL;
+
+  pack->hdrs = hdrs;
+}
+
+static inline void
+chat_base (result_t *res)
+{
+  chat (res, TYPE_CHAT_BASE);
+}
+
+static inline void
+chat_advanced (result_t *res)
+{
+  chat (res, TYPE_CHAT_ADVANCED);
 }
 
 static void
@@ -226,11 +305,16 @@ work (const char *path)
 
       result_t *res = malloc (sizeof (result_t));
       memcpy (res->key, key, len + 1);
+      res->advanced = false;
+      res->base = false;
       res->ok = false;
 
       results[num++] = res;
       get_models (res);
       get_info (res);
+
+      chat_advanced (res);
+      chat_base (res);
     }
 
   for (int n = 1, r; n;)
@@ -255,6 +339,8 @@ work (const char *path)
               get_models_hnd (pack);
             else if (pack->type == TYPE_INFO)
               get_info_hnd (pack);
+            else
+              chat_hnd (pack);
 
           clean:
             curl_slist_free_all (pack->hdrs);
@@ -267,7 +353,7 @@ work (const char *path)
     }
 
   FILE *result = fopen ("./result", "w");
-  fputs ("key, name, balance\n", result);
+  fputs ("key, name, balance, base, advanced\n", result);
 
   for (int i = 0; i < num; i++)
     {
@@ -278,7 +364,11 @@ work (const char *path)
       char *name = ok ? res->name : "";
       char *balance = ok ? res->balance : "";
 
-      fprintf (result, "%s, %s, %s\n", key, name, balance);
+      char base = res->base ? 'y' : 'n';
+      char advanced = res->advanced ? 'y' : 'n';
+
+      fprintf (result, "%s, %s, %s, %c, %c\n", key, name, balance, base,
+               advanced);
 
       free (res);
     }
