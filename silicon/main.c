@@ -7,10 +7,10 @@
 
 enum
 {
-  TYPE_CHAT_ADVANCED,
-  TYPE_CHAT_BASE,
-  TYPE_MODELS,
   TYPE_INFO,
+  TYPE_MODELS,
+  TYPE_CHAT_BASE,
+  TYPE_CHAT_ADVANCED,
 };
 
 typedef struct result_t result_t;
@@ -105,8 +105,59 @@ callback (char *data, size_t size, size_t nmemb, void *ptr)
   return total;
 }
 
+static inline void
+test (result_t *res, int type)
+{
+  static const char *urls[] = {
+    [TYPE_INFO] = "https://api.siliconflow.cn/v1/user/info",
+    [TYPE_MODELS] = "https://api.siliconflow.cn/v1/models",
+    [TYPE_CHAT_BASE... TYPE_CHAT_ADVANCED]
+    = "https://api.siliconflow.cn/v1/chat/completions",
+  };
+
+  CURL *hnd = curl_easy_init ();
+  pack_t *pack = malloc (sizeof (pack_t));
+
+  static char hdr_key[80];
+  sprintf (hdr_key, "authorization: Bearer %s", res->key);
+
+  struct curl_slist *hdrs = NULL;
+  hdrs = curl_slist_append (hdrs, hdr_key);
+  hdrs = curl_slist_append (hdrs, "accept: application/json");
+  hdrs = curl_slist_append (hdrs, "content-type: application/json");
+
+  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
+  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
+  curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
+  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
+
+  const char *method = "GET";
+  const char *url = urls[type];
+
+  switch (pack->type = type)
+    {
+    case TYPE_CHAT_BASE:
+      curl_easy_setopt (hnd, CURLOPT_POSTFIELDS, chat_base_data);
+      method = "POST";
+      break;
+    case TYPE_CHAT_ADVANCED:
+      curl_easy_setopt (hnd, CURLOPT_POSTFIELDS, chat_advanced_data);
+      method = "POST";
+      break;
+    }
+
+  curl_easy_setopt (hnd, CURLOPT_URL, url);
+  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, method);
+
+  curl_multi_add_handle (multi, hnd);
+  pack->data = NULL;
+  pack->hdrs = hdrs;
+  pack->res = res;
+  pack->size = 0;
+}
+
 static void
-get_models_hnd (pack_t *pack)
+hnd_models (pack_t *pack)
 {
   json_t *json = json_loadb (pack->data, pack->size, 0, NULL);
 
@@ -129,41 +180,7 @@ get_models_hnd (pack_t *pack)
 }
 
 static void
-get_models (result_t *res)
-{
-  CURL *hnd = curl_easy_init ();
-  pack_t *pack = malloc (sizeof (pack_t));
-
-#define URL_MODELS "https://api.siliconflow.cn/v1/models"
-
-  curl_easy_setopt (hnd, CURLOPT_URL, URL_MODELS);
-  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
-
-  static char hdr_key[80];
-  sprintf (hdr_key, "authorization: Bearer %s", res->key);
-
-  struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, hdr_key);
-  hdrs = curl_slist_append (hdrs, "accept: application/json");
-
-  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
-  curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
-  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
-
-  curl_multi_add_handle (multi, hnd);
-
-  pack->res = res;
-
-  pack->size = 0;
-  pack->data = NULL;
-
-  pack->hdrs = hdrs;
-  pack->type = TYPE_MODELS;
-}
-
-static void
-get_info_hnd (pack_t *pack)
+hnd_info (pack_t *pack)
 {
   result_t *res = pack->res;
   json_t *json = json_loadb (pack->data, pack->size, 0, NULL);
@@ -181,42 +198,8 @@ get_info_hnd (pack_t *pack)
     }
 }
 
-static void
-get_info (result_t *res)
-{
-  CURL *hnd = curl_easy_init ();
-  pack_t *pack = malloc (sizeof (pack_t));
-
-#define URL_INFO "https://api.siliconflow.cn/v1/user/info"
-
-  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "GET");
-  curl_easy_setopt (hnd, CURLOPT_URL, URL_INFO);
-
-  static char hdr_key[80];
-  sprintf (hdr_key, "authorization: Bearer %s", res->key);
-
-  struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, hdr_key);
-  hdrs = curl_slist_append (hdrs, "accept: application/json");
-
-  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
-  curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
-  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
-
-  curl_multi_add_handle (multi, hnd);
-
-  pack->res = res;
-  pack->type = TYPE_INFO;
-
-  pack->size = 0;
-  pack->data = NULL;
-
-  pack->hdrs = hdrs;
-}
-
 static inline void
-chat_hnd (pack_t *pack)
+hnd_chat (pack_t *pack)
 {
   switch (pack->type)
     {
@@ -227,65 +210,6 @@ chat_hnd (pack_t *pack)
       pack->res->advanced = true;
       break;
     }
-}
-
-static void
-chat (result_t *res, int type)
-{
-  CURL *hnd = curl_easy_init ();
-  pack_t *pack = malloc (sizeof (pack_t));
-
-#define URL_CHAT "https://api.siliconflow.cn/v1/chat/completions"
-
-  curl_easy_setopt (hnd, CURLOPT_CUSTOMREQUEST, "POST");
-  curl_easy_setopt (hnd, CURLOPT_URL, URL_CHAT);
-
-  const char *data;
-  static char hdr_key[80];
-  sprintf (hdr_key, "authorization: Bearer %s", res->key);
-
-  switch (type)
-    {
-    case TYPE_CHAT_BASE:
-      data = chat_base_data;
-      break;
-    case TYPE_CHAT_ADVANCED:
-      data = chat_advanced_data;
-      break;
-    }
-
-  struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, hdr_key);
-  hdrs = curl_slist_append (hdrs, "accept: application/json");
-  hdrs = curl_slist_append (hdrs, "content-type: application/json");
-
-  curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
-  curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
-  curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
-  curl_easy_setopt (hnd, CURLOPT_POSTFIELDS, data);
-  curl_easy_setopt (hnd, CURLOPT_WRITEFUNCTION, callback);
-
-  curl_multi_add_handle (multi, hnd);
-
-  pack->res = res;
-  pack->type = type;
-
-  pack->size = 0;
-  pack->data = NULL;
-
-  pack->hdrs = hdrs;
-}
-
-static inline void
-chat_base (result_t *res)
-{
-  chat (res, TYPE_CHAT_BASE);
-}
-
-static inline void
-chat_advanced (result_t *res)
-{
-  chat (res, TYPE_CHAT_ADVANCED);
 }
 
 static void
@@ -310,11 +234,10 @@ work (const char *path)
       res->ok = false;
 
       results[num++] = res;
-      get_models (res);
-      get_info (res);
-
-      chat_advanced (res);
-      chat_base (res);
+      test (res, TYPE_INFO);
+      test (res, TYPE_MODELS);
+      test (res, TYPE_CHAT_BASE);
+      test (res, TYPE_CHAT_ADVANCED);
     }
 
   for (int n = 1, r; n;)
@@ -336,11 +259,11 @@ work (const char *path)
               goto clean;
 
             if (pack->type == TYPE_MODELS && !got_models)
-              get_models_hnd (pack);
+              hnd_models (pack);
             else if (pack->type == TYPE_INFO)
-              get_info_hnd (pack);
+              hnd_info (pack);
             else
-              chat_hnd (pack);
+              hnd_chat (pack);
 
           clean:
             curl_slist_free_all (pack->hdrs);
