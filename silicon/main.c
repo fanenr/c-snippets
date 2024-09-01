@@ -25,6 +25,8 @@ struct result_t
 
   bool base;
   bool advanced;
+
+  void *share;
 };
 
 struct pack_t
@@ -34,8 +36,6 @@ struct pack_t
 
   char *data;
   size_t size;
-
-  struct curl_slist *hdrs;
 };
 
 static void init (void);
@@ -121,10 +121,14 @@ test (result_t *res, int type)
   static char hdr_key[80];
   sprintf (hdr_key, "authorization: Bearer %s", res->key);
 
-  struct curl_slist *hdrs = NULL;
-  hdrs = curl_slist_append (hdrs, hdr_key);
-  hdrs = curl_slist_append (hdrs, "accept: application/json");
-  hdrs = curl_slist_append (hdrs, "content-type: application/json");
+  struct curl_slist *hdrs;
+  if (!(hdrs = res->share))
+    {
+      hdrs = curl_slist_append (hdrs, "content-type: application/json");
+      hdrs = curl_slist_append (hdrs, "accept: application/json");
+      hdrs = curl_slist_append (hdrs, hdr_key);
+      res->share = hdrs;
+    }
 
   curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
   curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
@@ -151,7 +155,6 @@ test (result_t *res, int type)
 
   curl_multi_add_handle (multi, hnd);
   pack->data = NULL;
-  pack->hdrs = hdrs;
   pack->res = res;
   pack->size = 0;
 }
@@ -230,6 +233,7 @@ work (const char *path)
       result_t *res = malloc (sizeof (result_t));
       memcpy (res->key, key, len + 1);
       res->advanced = false;
+      res->share = NULL;
       res->base = false;
       res->ok = false;
 
@@ -240,12 +244,11 @@ work (const char *path)
       test (res, TYPE_CHAT_ADVANCED);
     }
 
-  for (int n = 1, r; n;)
+  for (int n, c; (curl_multi_perform (multi, &n), n);)
     {
-      curl_multi_perform (multi, &n);
       curl_multi_poll (multi, NULL, 0, 1000, NULL);
 
-      for (struct CURLMsg *m; (m = curl_multi_info_read (multi, &r));)
+      for (struct CURLMsg *m; (m = curl_multi_info_read (multi, &c));)
         if (m->msg == CURLMSG_DONE)
           {
             long code;
@@ -266,7 +269,6 @@ work (const char *path)
               hnd_chat (pack);
 
           clean:
-            curl_slist_free_all (pack->hdrs);
             free (pack->data);
             free (pack);
 
@@ -293,6 +295,7 @@ work (const char *path)
       fprintf (result, "%s, %s, %s, %c, %c\n", key, name, balance, base,
                advanced);
 
+      curl_slist_free_all (res->share);
       free (res);
     }
 }
