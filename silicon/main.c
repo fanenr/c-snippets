@@ -130,6 +130,7 @@ test (result_t *res, int type)
       res->share = hdrs;
     }
 
+  curl_easy_setopt (hnd, CURLOPT_TIMEOUT, 15);
   curl_easy_setopt (hnd, CURLOPT_PRIVATE, pack);
   curl_easy_setopt (hnd, CURLOPT_WRITEDATA, pack);
   curl_easy_setopt (hnd, CURLOPT_HTTPHEADER, hdrs);
