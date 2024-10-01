@@ -62,7 +62,7 @@ init (void)
   multi = curl_multi_init ();
 
   json_t *base
-      = json_pack ("{s:s,s:[{s:s,s:s}]}", "model", "Qwen/Qwen2-72B-Instruct",
+      = json_pack ("{s:s,s:[{s:s,s:s}]}", "model", "Qwen/Qwen2.5-72B-Instruct",
                    "messages", "role", "user", "content", "AI 是什么？");
   json_t *advanced
       = json_pack ("{s:s,s:[{s:s,s:s}]}", "model",
