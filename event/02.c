@@ -2,18 +2,16 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-static bool stop;
-static int timer_calls;
-
+static int loops;
 static struct timeval tv = { .tv_sec = 1 };
 
 void
 timer_cb (evutil_socket_t fd, short flags, void *arg)
 {
   struct event *ev = arg;
-  printf ("timer_calls: %d\n", ++timer_calls);
+  printf ("loops: %d\n", loops);
 
-  if (timer_calls == 3)
+  if (loops == 2)
     {
       event_del (ev);
       event_assign (ev, event_get_base (ev), fd, flags & ~EV_PERSIST,
@@ -21,11 +19,8 @@ timer_cb (evutil_socket_t fd, short flags, void *arg)
       event_add (ev, &tv);
     }
 
-  if (timer_calls >= 5)
-    {
-      event_free (ev);
-      stop = true;
-    }
+  if (loops >= 5)
+    event_free (ev);
 }
 
 int
@@ -39,8 +34,11 @@ main (void)
 
   event_add (ev, &tv);
 
-  for (; !stop;)
-    event_base_loop (base, EVLOOP_NO_EXIT_ON_EMPTY);
+  for (; loops < 6; loops++)
+    event_base_loop (base, EVLOOP_ONCE);
+
+  if (loops >= 6)
+    event_free (ev);
 
   event_base_free (base);
 }
