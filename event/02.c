@@ -1,0 +1,46 @@
+#include <event2/event.h>
+#include <stdbool.h>
+#include <stdio.h>
+
+static bool stop;
+static int timer_calls;
+
+static struct timeval tv = { .tv_sec = 1 };
+
+void
+timer_cb (evutil_socket_t fd, short flags, void *arg)
+{
+  struct event *ev = arg;
+  printf ("timer_calls: %d\n", ++timer_calls);
+
+  if (timer_calls == 3)
+    {
+      event_del (ev);
+      event_assign (ev, event_get_base (ev), fd, flags & ~EV_PERSIST,
+                    event_get_callback (ev), event_get_callback_arg (ev));
+      event_add (ev, &tv);
+    }
+
+  if (timer_calls >= 5)
+    {
+      event_free (ev);
+      stop = true;
+    }
+}
+
+int
+main (void)
+{
+  struct event_base *base = event_base_new ();
+  event_base_priority_init (base, 1);
+
+  struct event *ev = event_new (base, -1, EV_TIMEOUT | EV_PERSIST, timer_cb,
+                                event_self_cbarg ());
+
+  event_add (ev, &tv);
+
+  for (; !stop;)
+    event_base_loop (base, EVLOOP_NO_EXIT_ON_EMPTY);
+
+  event_base_free (base);
+}
