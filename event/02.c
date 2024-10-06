@@ -1,5 +1,4 @@
 #include <event2/event.h>
-#include <stdbool.h>
 #include <stdio.h>
 
 static int loops;
