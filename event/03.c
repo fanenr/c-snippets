@@ -12,9 +12,8 @@
 static void
 read_cb (struct bufferevent *bev, void *arg)
 {
-  struct evbuffer *in = bufferevent_get_input (bev);
   struct evbuffer *out = bufferevent_get_output (bev);
-
+  struct evbuffer *in = bufferevent_get_input (bev);
   evbuffer_add_buffer (out, in);
 }
 
@@ -71,12 +70,14 @@ main (void)
   if (0 != listen (serv, 32))
     abort ();
 
+  evutil_make_socket_nonblocking (serv);
+  evutil_make_listen_socket_reuseable (serv);
+
   struct event_base *base = event_base_new ();
   struct evconnlistener *lev
-      = evconnlistener_new (base, accept_cb, NULL, LEV_OPT_REUSEABLE, 0, serv);
+      = evconnlistener_new (base, accept_cb, NULL, 0, 0, serv);
 
   evconnlistener_set_error_cb (lev, accept_error_cb);
-
   event_base_dispatch (base);
   event_base_free (base);
   close (serv);
