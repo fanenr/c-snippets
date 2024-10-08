@@ -5,7 +5,7 @@ static int loops;
 static struct timeval tv = { .tv_sec = 1 };
 
 void
-timer_cb (evutil_socket_t fd, short flags, void *arg)
+timer_cb (evutil_socket_t fd, short events, void *arg)
 {
   struct event *ev = arg;
   printf ("loops: %d\n", loops);
@@ -13,7 +13,7 @@ timer_cb (evutil_socket_t fd, short flags, void *arg)
   if (loops == 2)
     {
       event_del (ev);
-      event_assign (ev, event_get_base (ev), fd, flags & ~EV_PERSIST,
+      event_assign (ev, event_get_base (ev), fd, events & ~EV_PERSIST,
                     event_get_callback (ev), event_get_callback_arg (ev));
       event_add (ev, &tv);
     }

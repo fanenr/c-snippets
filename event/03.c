@@ -20,9 +20,6 @@ read_cb (struct bufferevent *bev, void *arg)
 static void
 write_cb (struct bufferevent *bev, void *arg)
 {
-  struct evbuffer *out = bufferevent_get_output (bev);
-  struct evbuffer *in = bufferevent_get_input (bev);
-  evbuffer_add_buffer (out, in);
 }
 
 static void
@@ -36,8 +33,8 @@ event_cb (struct bufferevent *bev, short events, void *arg)
 }
 
 void
-accept_cb (struct evconnlistener *lev, evutil_socket_t clnt,
-           struct sockaddr *addr, int len, void *arg)
+accept_cb (struct evconnlistener *lev, int clnt, struct sockaddr *addr,
+           int len, void *arg)
 {
   struct event_base *base = evconnlistener_get_base (lev);
   struct bufferevent *bev = bufferevent_socket_new (base, clnt, 0);
@@ -56,12 +53,16 @@ int
 main (void)
 {
   int serv;
+  struct event_base *base;
+  struct evconnlistener *lev;
 
   struct sockaddr_in addr = {
     .sin_family = AF_INET,
     .sin_port = htons (3354),
     .sin_addr.s_addr = htonl (INADDR_ANY),
   };
+
+  base = event_base_new ();
 
   if (-1 == (serv = socket (AF_INET, SOCK_STREAM, 0)))
     abort ();
@@ -73,11 +74,10 @@ main (void)
   evutil_make_socket_nonblocking (serv);
   evutil_make_listen_socket_reuseable (serv);
 
-  struct event_base *base = event_base_new ();
-  struct evconnlistener *lev
-      = evconnlistener_new (base, accept_cb, NULL, 0, 0, serv);
-
+  lev = evconnlistener_new (base, NULL, NULL, 0, 0, serv);
   evconnlistener_set_error_cb (lev, accept_error_cb);
+  evconnlistener_set_cb (lev, accept_cb, NULL);
+
   event_base_dispatch (base);
   event_base_free (base);
   close (serv);
