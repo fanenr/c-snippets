@@ -17,27 +17,24 @@ timer_cb (evutil_socket_t fd, short events, void *arg)
                     event_get_callback (ev), event_get_callback_arg (ev));
       event_add (ev, &tv);
     }
-
-  if (loops >= 5)
-    event_free (ev);
 }
 
 int
 main (void)
 {
-  struct event_base *base = event_base_new ();
+  struct event *ev;
+  struct event_base *base;
+
+  base = event_base_new ();
   event_base_priority_init (base, 1);
 
-  struct event *ev = event_new (base, -1, EV_TIMEOUT | EV_PERSIST, timer_cb,
-                                event_self_cbarg ());
-
+  ev = event_new (base, -1, EV_TIMEOUT | EV_PERSIST, timer_cb,
+                  event_self_cbarg ());
   event_add (ev, &tv);
 
   for (; loops < 6; loops++)
     event_base_loop (base, EVLOOP_ONCE);
 
-  if (loops >= 6)
-    event_free (ev);
-
+  event_free (ev);
   event_base_free (base);
 }
