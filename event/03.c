@@ -62,8 +62,6 @@ main (void)
     .sin_addr.s_addr = htonl (INADDR_ANY),
   };
 
-  base = event_base_new ();
-
   if (-1 == (serv = socket (AF_INET, SOCK_STREAM, 0)))
     abort ();
   if (0 != bind (serv, (void *)&addr, sizeof (addr)))
@@ -74,11 +72,15 @@ main (void)
   evutil_make_socket_nonblocking (serv);
   evutil_make_listen_socket_reuseable (serv);
 
+  base = event_base_new ();
   lev = evconnlistener_new (base, NULL, NULL, 0, 0, serv);
-  evconnlistener_set_error_cb (lev, accept_error_cb);
+
   evconnlistener_set_cb (lev, accept_cb, NULL);
+  evconnlistener_set_error_cb (lev, accept_error_cb);
 
   event_base_dispatch (base);
+
+  evconnlistener_free (lev);
   event_base_free (base);
   close (serv);
 }
