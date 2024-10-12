@@ -10,6 +10,7 @@ main (int argc, char **argv)
 {
   int fd;
   void *buff;
+  size_t size;
   const char *path;
   struct io_uring_sqe *sqe;
   struct io_uring_cqe *cqe;
@@ -25,7 +26,7 @@ main (int argc, char **argv)
   struct stat stat;
   assert (fstat (fd, &stat) == 0);
 
-  size_t size = stat.st_size;
+  size = stat.st_size;
   assert ((buff = malloc (size)));
 
   sqe = io_uring_get_sqe (&ring);
