@@ -1,51 +1,104 @@
-#include <assert.h>
-#include <liburing.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <liburing.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#define error(code, fmt, ...)                                                 \
+  do                                                                          \
+    {                                                                         \
+      fprintf (stderr, "%s:%s:%d: error: ", __FILE__, __FUNCTION__,           \
+               __LINE__);                                                     \
+      fprintf (stderr, fmt, ##__VA_ARGS__);                                   \
+      fprintf (stderr, "\n");                                                 \
+      exit (code);                                                            \
+    }                                                                         \
+  while (0)
+
+#define QUEUE_SIZE 16
+#define BLK_SIZE 4096
+
+#define submit(ring)                                                          \
+  do                                                                          \
+    {                                                                         \
+      int ret;                                                                \
+      if ((ret = io_uring_submit (ring)) < 0)                                 \
+        error (1, "%s", strerror (-ret));                                     \
+    }                                                                         \
+  while (0)
+
+size_t
+sizeof_fd (int fd)
+{
+  struct stat stat;
+  if (fstat (fd, &stat) != 0)
+    error (1, "%s", strerror (errno));
+  return stat.st_size;
+}
+
+void
+prep_read (struct io_uring *ring, int fd, void *buff, unsigned len, off_t off)
+{
+  struct io_uring_sqe *sqe;
+  if ((sqe = io_uring_get_sqe (ring)))
+    return io_uring_prep_read (sqe, fd, buff, len, off);
+
+  submit (ring);
+
+  sqe = io_uring_get_sqe (ring);
+  io_uring_prep_read (sqe, fd, buff, len, off);
+}
 
 int
 main (int argc, char **argv)
 {
-  int fd;
-  void *buff;
-  size_t size;
-  const char *path;
-  struct io_uring_sqe *sqe;
-  struct io_uring_cqe *cqe;
+  if (argc < 2)
+    error (1, "Usage: %s <file>", argv[0]);
 
-  assert (argc >= 2);
-
+  int ret, fd;
   struct io_uring ring;
-  assert (io_uring_queue_init (8, &ring, 0) == 0);
 
-  path = argv[1];
-  assert ((fd = open (path, O_RDONLY)) >= 0);
+  if ((fd = open (argv[1], O_RDONLY)) < 0)
+    error (1, "%s", strerror (errno));
 
-  struct stat stat;
-  assert (fstat (fd, &stat) == 0);
+  if ((ret = io_uring_queue_init (QUEUE_SIZE, &ring, 0)))
+    error (1, "%s", strerror (-ret));
 
-  size = stat.st_size;
-  assert ((buff = malloc (size)));
+  size_t size = sizeof_fd (fd);
+  size_t nblks = size / BLK_SIZE;
 
-  sqe = io_uring_get_sqe (&ring);
-  io_uring_prep_read (sqe, fd, buff, size, 0);
-  sqe->flags |= IOSQE_IO_LINK;
+  if (size % BLK_SIZE)
+    nblks++;
 
-  sqe = io_uring_get_sqe (&ring);
-  io_uring_prep_write (sqe, STDOUT_FILENO, buff, size, 0);
+  void **blks;
 
-  assert (io_uring_submit (&ring) == 2);
+  if (!(blks = malloc (nblks * sizeof (void *))))
+    error (1, "%s", strerror (errno));
 
-  for (int i = 0; i < 2; i++)
+  for (size_t i = 0; i < nblks; i++)
+    if (!(blks[i] = aligned_alloc (BLK_SIZE, BLK_SIZE)))
+      error (1, "%s", strerror (errno));
+
+  for (size_t i = 0; i < nblks; i++)
+    prep_read (&ring, fd, blks[i], BLK_SIZE, i * BLK_SIZE);
+
+  submit (&ring);
+
+  for (size_t i = 0; i < nblks; i++)
     {
-      assert (io_uring_wait_cqe (&ring, &cqe) == 0);
-      assert (cqe->res >= 0);
+      struct io_uring_cqe *cqe;
+      if ((ret = io_uring_wait_cqe (&ring, &cqe)))
+        error (1, "%s", strerror (-ret));
       io_uring_cqe_seen (&ring, cqe);
     }
 
-  io_uring_queue_exit (&ring);
-  free (buff);
-  close (fd);
+  for (size_t i = 0; i < nblks; i++)
+    {
+      size_t buff_size = size > BLK_SIZE ? BLK_SIZE : size;
+      if (fwrite (blks[i], 1, buff_size, stdout) != buff_size)
+        error (1, "%s", strerror (errno));
+      size -= buff_size;
+    }
 }
