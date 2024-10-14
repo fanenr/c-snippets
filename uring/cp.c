@@ -6,8 +6,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define QUEUE_SIZE 64
 #define BLK_SIZE 4096
+#define QUEUE_DEPTH 64
 
 #define error(code, fmt, ...)                                                 \
   do                                                                          \
@@ -28,6 +28,15 @@
         error (1, "%s", strerror (-ret));                                     \
     }                                                                         \
   while (0)
+
+#define wait_cqe(ring)                                                        \
+  ({                                                                          \
+    int ret;                                                                  \
+    struct io_uring_cqe *cqe;                                                 \
+    if ((ret = io_uring_wait_cqe (ring, &cqe)))                               \
+      error (1, "%s", strerror (-ret));                                       \
+    cqe;                                                                      \
+  })
 
 #define check_cqe(cqe)                                                        \
   do                                                                          \
@@ -71,9 +80,7 @@ get:
 
   submit (ring);
 
-  if ((ret = io_uring_wait_cqe (ring, &cqe)))
-    error (1, "%s", strerror (-ret));
-
+  cqe = wait_cqe (ring);
   check_cqe (cqe);
   io_uring_cqe_seen (ring, cqe);
 
@@ -121,7 +128,7 @@ main (int argc, char **argv)
   if ((wfd = open (argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0)
     error (1, "%s", strerror (errno));
 
-  if ((ret = io_uring_queue_init (QUEUE_SIZE, &ring, 0)))
+  if ((ret = io_uring_queue_init (QUEUE_DEPTH, &ring, 0)))
     error (1, "%s", strerror (-ret));
 
   size_t size = sizeof_fd (rfd);
@@ -152,8 +159,7 @@ main (int argc, char **argv)
        io_uring_sq_ready (&ring) || io_uring_cq_ready (&ring);
        io_uring_cqe_seen (&ring, cqe))
     {
-      if ((ret = io_uring_wait_cqe (&ring, &cqe)))
-        error (1, "%s", strerror (-ret));
+      cqe = wait_cqe (&ring);
       check_cqe (cqe);
     }
 }
