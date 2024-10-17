@@ -9,6 +9,16 @@
 #define BLK_SIZE 4096
 #define QUEUE_DEPTH 64
 
+union io_data
+{
+  __u64 u64;
+  struct
+  {
+    int op;
+    unsigned len;
+  };
+};
+
 #define error(code, fmt, ...)                                                 \
   do                                                                          \
     {                                                                         \
@@ -42,20 +52,10 @@
   do                                                                          \
     {                                                                         \
       union io_data data = { cqe->user_data };                                \
-      if (cqe->res != data.data.len)                                          \
+      if (cqe->res != data.len)                                               \
         error (1, "failed to read");                                          \
     }                                                                         \
   while (0)
-
-union io_data
-{
-  __u64 u64;
-  struct
-  {
-    int op;
-    unsigned len;
-  } data;
-};
 
 size_t
 sizeof_fd (int fd)
@@ -78,7 +78,6 @@ get:
     return sqe;
 
   submit (ring);
-
   cqe = wait_cqe (ring);
   check_cqe (cqe);
   io_uring_cqe_seen (ring, cqe);
@@ -98,7 +97,7 @@ prep_read (struct io_uring *ring, int fd, void *buff, unsigned len, off_t off)
   sqe = get_sqe (ring);
   io_uring_prep_read (sqe, fd, buff, len, off);
 
-  data.data.len = len;
+  data.len = len;
   sqe->user_data = data.u64;
 }
 

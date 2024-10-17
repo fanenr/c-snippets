@@ -9,6 +9,16 @@
 #define BLK_SIZE 4096
 #define QUEUE_DEPTH 64
 
+union io_data
+{
+  __u64 u64;
+  struct
+  {
+    int op;
+    unsigned len;
+  };
+};
+
 #define error(code, fmt, ...)                                                 \
   do                                                                          \
     {                                                                         \
@@ -42,21 +52,11 @@
   do                                                                          \
     {                                                                         \
       union io_data data = { cqe->user_data };                                \
-      if (cqe->res != data.data.len)                                          \
+      if (cqe->res != data.len)                                               \
         error (1, "failed to %s",                                             \
-               (data.data.op == IORING_OP_READ) ? "read" : "write");          \
+               (data.op == IORING_OP_READ) ? "read" : "write");               \
     }                                                                         \
   while (0)
-
-union io_data
-{
-  __u64 u64;
-  struct
-  {
-    int op;
-    unsigned len;
-  } data;
-};
 
 size_t
 sizeof_fd (int fd)
@@ -79,7 +79,6 @@ get:
     return sqe;
 
   submit (ring);
-
   cqe = wait_cqe (ring);
   check_cqe (cqe);
   io_uring_cqe_seen (ring, cqe);
@@ -101,15 +100,15 @@ prep_copy (struct io_uring *ring, int rfd, int wfd, void *buff, unsigned len,
   io_uring_prep_read (sqe, rfd, buff, len, off);
   sqe->flags |= IOSQE_IO_LINK;
 
-  data.data.len = len;
-  data.data.op = IORING_OP_READ;
+  data.len = len;
+  data.op = IORING_OP_READ;
   sqe->user_data = data.u64;
 
   sqe = get_sqe (ring);
   io_uring_prep_write (sqe, wfd, buff, len, off);
 
-  data.data.len = len;
-  data.data.op = IORING_OP_WRITE;
+  data.len = len;
+  data.op = IORING_OP_WRITE;
   sqe->user_data = data.u64;
 }
 
