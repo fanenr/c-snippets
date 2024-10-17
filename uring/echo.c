@@ -100,7 +100,6 @@ get:
     return sqe;
 
   submit ();
-
   cqe = wait_cqe ();
   hnd_cqe (cqe);
 
