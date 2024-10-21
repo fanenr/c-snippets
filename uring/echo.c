@@ -264,7 +264,8 @@ main (void)
   if (0 != listen (serv, 32))
     error (1, "%s", strerror (errno));
 
-  if ((ret = io_uring_queue_init (QUEUE_DEPTH, &ring, 0)))
+  struct io_uring_params params = { .cq_entries = QUEUE_DEPTH * 4 };
+  if ((ret = io_uring_queue_init_params (QUEUE_DEPTH, &ring, &params)))
     error (1, "%s", strerror (-ret));
 
   prep_accept ();
