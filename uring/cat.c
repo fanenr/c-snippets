@@ -52,7 +52,7 @@ union io_data
   do                                                                          \
     {                                                                         \
       union io_data data = { cqe->user_data };                                \
-      if (cqe->res != data.len)                                               \
+      if ((size_t)cqe->res != data.len)                                       \
         error (1, "failed to read");                                          \
     }                                                                         \
   while (0)

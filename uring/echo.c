@@ -86,7 +86,7 @@ static void hnd_cqe (struct io_uring_cqe *cqe);
 
 static int serv;
 static struct io_uring ring;
-struct __kernel_timespec ts = { 10 };
+struct __kernel_timespec ts = { .tv_sec = 10 };
 
 struct io_uring_sqe *
 get_sqe (void)
@@ -194,7 +194,7 @@ prep_send (int inlen, struct context *ctx)
 void
 check_send (int outlen, struct context *ctx)
 {
-  if (outlen != ctx->outlen)
+  if ((size_t)outlen != ctx->outlen)
     return drop_conn (ctx);
   prep_recv (0, ctx);
 }
