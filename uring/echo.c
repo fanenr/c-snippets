@@ -41,14 +41,14 @@ struct context
   size_t outlen;
 };
 
-#define ptr2ctx(ptr) ((intptr_t)ptr >> 3)
-#define ctx2ptr(ctx) ((void *)((intptr_t)ctx << 3))
+#define ptr2ctx(ptr) ((intptr_t) ptr >> 3)
+#define ctx2ptr(ctx) ((void *) ((intptr_t) ctx << 3))
 
 #define error(code, fmt, ...)                                                 \
   do                                                                          \
     {                                                                         \
       fprintf (stderr, "%s:%s:%d: error: ", __FILE__, __FUNCTION__,           \
-               __LINE__);                                                     \
+	       __LINE__);                                                     \
       fprintf (stderr, fmt, ##__VA_ARGS__);                                   \
       fprintf (stderr, "\n");                                                 \
       exit (code);                                                            \
@@ -77,7 +77,7 @@ struct context
     {                                                                         \
       int ret;                                                                \
       if ((ret = io_uring_submit (&ring)) < 0)                                \
-        error (1, "%s", strerror (-ret));                                     \
+	error (1, "%s", strerror (-ret));                                     \
     }                                                                         \
   while (0)
 
@@ -194,7 +194,7 @@ prep_send (int inlen, struct context *ctx)
 void
 check_send (int outlen, struct context *ctx)
 {
-  if ((size_t)outlen != ctx->outlen)
+  if ((size_t) outlen != ctx->outlen)
     return drop_conn (ctx);
   prep_recv (0, ctx);
 }
@@ -258,7 +258,7 @@ main (void)
   if (setsockopt (serv, SOL_SOCKET, SO_REUSEADDR, &opt, len) != 0)
     error (1, "%s", strerror (errno));
 
-  if (0 != bind (serv, (void *)&addr, sizeof (addr)))
+  if (0 != bind (serv, (void *) &addr, sizeof (addr)))
     error (1, "%s", strerror (errno));
 
   if (0 != listen (serv, 32))

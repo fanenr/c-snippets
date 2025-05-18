@@ -140,7 +140,7 @@ prod_t *prod_of (token_t *nt, token_t *tok);
     {                                                                         \
       stack.size = 0;                                                         \
       for (; tok; tok = token_next ())                                        \
-        ;                                                                     \
+	;                                                                     \
     }                                                                         \
   while (0)
 
@@ -152,44 +152,44 @@ main (void)
   for (token_t *tok, *top;;)
     {
       if (!(top = STACK_TOP ()))
-        {
-          tok = token_next ();
-          STACK_PUSH (&nt_S);
-          top = &nt_S;
-        }
+	{
+	  tok = token_next ();
+	  STACK_PUSH (&nt_S);
+	  top = &nt_S;
+	}
 
       if (TOKEN_IS_T (top))
-        {
-          if (tok != top)
-            {
-              printf ("syntax error\n\n");
-              RESET ();
-              continue;
-            }
+	{
+	  if (tok != top)
+	    {
+	      printf ("syntax error\n\n");
+	      RESET ();
+	      continue;
+	    }
 
-          STACK_POP ();
-          if (!stack.size)
-            {
-              printf ("parse ok\n\n");
-              RESET ();
-              continue;
-            }
+	  STACK_POP ();
+	  if (!stack.size)
+	    {
+	      printf ("parse ok\n\n");
+	      RESET ();
+	      continue;
+	    }
 
-          tok = token_next ();
-          continue;
-        }
+	  tok = token_next ();
+	  continue;
+	}
 
       prod_t *prod;
       STACK_POP ();
       if (!(prod = prod_of (top, tok)))
-        {
-          printf ("syntax error\n\n");
-          RESET ();
-          continue;
-        }
+	{
+	  printf ("syntax error\n\n");
+	  RESET ();
+	  continue;
+	}
 
       for (int i = prod->rsize - 1; i >= 0; i--)
-        STACK_PUSH (prod->right[i]);
+	STACK_PUSH (prod->right[i]);
     }
 }
 
@@ -209,12 +209,12 @@ print_info (void)
       printf ("\t\t");
       first_of (nt, first);
       for (token_t **ptr = first; *ptr; ptr++)
-        printf ("%s ", (*ptr)->sval);
+	printf ("%s ", (*ptr)->sval);
 
       printf ("\t\t");
       follow_of (nt, follow);
       for (token_t **ptr = follow; *ptr; ptr++)
-        printf ("%s ", (*ptr)->sval);
+	printf ("%s ", (*ptr)->sval);
       puts ("");
     }
 
@@ -228,7 +228,7 @@ print_info (void)
 
       first_of2 (prod, first);
       for (token_t **ptr = first; *ptr; ptr++)
-        printf ("%s ", (*ptr)->sval);
+	printf ("%s ", (*ptr)->sval);
       puts ("");
     }
 
@@ -242,10 +242,10 @@ print_info (void)
       token_t *nt = nts[i];
       printf ("%-4s", nt->sval);
       for (int j = 0; j < ts_size; j++)
-        {
-          prod_t *prod = prod_of (nt, ts[j]);
-          printf ("%-10s", prod ? prod->sval : "");
-        }
+	{
+	  prod_t *prod = prod_of (nt, ts[j]);
+	  printf ("%-10s", prod ? prod->sval : "");
+	}
       puts ("");
     }
   puts ("");
@@ -261,10 +261,10 @@ nullable (token_t *nt)
     {
       prod_t *prod = prods[i];
       if (nt != prod->left)
-        continue;
+	continue;
 
       if (nullable2 (prod))
-        return true;
+	return true;
     }
 
   return false;
@@ -294,18 +294,18 @@ first_of (token_t *tok, token_t **result)
     {
       prod_t *prod = prods[i];
       if (tok != prod->left)
-        continue;
+	continue;
 
       for (int i = 0; i < prod->rsize; i++)
-        {
-          token_t *r = prod->right[i];
-          first_of (r, temp);
+	{
+	  token_t *r = prod->right[i];
+	  first_of (r, temp);
 
-          for (token_t **ptr = temp; *ptr; ptr++)
-            result[num++] = *ptr;
-          if (!nullable (r))
-            break;
-        }
+	  for (token_t **ptr = temp; *ptr; ptr++)
+	    result[num++] = *ptr;
+	  if (!nullable (r))
+	    break;
+	}
     }
 
 ret:
@@ -324,9 +324,9 @@ first_of2 (prod_t *prod, token_t **result)
       first_of (r, temp);
 
       for (token_t **ptr = temp; *ptr; ptr++)
-        result[num++] = *ptr;
+	result[num++] = *ptr;
       if (!nullable (r))
-        break;
+	break;
     }
 
 ret:
@@ -346,29 +346,29 @@ follow_of (token_t *nt, token_t **result)
       prod_t *prod = prods[i];
 
       for (int i = 0; i < prod->rsize; i++)
-        {
-          if (nt != prod->right[i])
-            continue;
+	{
+	  if (nt != prod->right[i])
+	    continue;
 
-          for (int j = i + 1; j < prod->rsize + 1; j++)
-            {
-              if (j == prod->rsize)
-                {
-                  follow_of (prod->left, temp);
-                  for (token_t **ptr = temp; *ptr; ptr++)
-                    result[num++] = *ptr;
-                  break;
-                }
+	  for (int j = i + 1; j < prod->rsize + 1; j++)
+	    {
+	      if (j == prod->rsize)
+		{
+		  follow_of (prod->left, temp);
+		  for (token_t **ptr = temp; *ptr; ptr++)
+		    result[num++] = *ptr;
+		  break;
+		}
 
-              token_t *next = prod->right[j];
-              first_of (next, temp);
+	      token_t *next = prod->right[j];
+	      first_of (next, temp);
 
-              for (token_t **ptr = temp; *ptr; ptr++)
-                result[num++] = *ptr;
-              if (!nullable (next))
-                break;
-            }
-        }
+	      for (token_t **ptr = temp; *ptr; ptr++)
+		result[num++] = *ptr;
+	      if (!nullable (next))
+		break;
+	    }
+	}
     }
 
 ret:
@@ -385,20 +385,20 @@ prod_of (token_t *nt, token_t *tok)
     {
       prod_t *prod = prods[i];
       if (nt != prod->left)
-        continue;
+	continue;
 
       first_of2 (prod, first);
       for (token_t **ptr = first; *ptr; ptr++)
-        if (tok == *ptr)
-          return prod;
+	if (tok == *ptr)
+	  return prod;
 
       if (!nullable2 (prod))
-        continue;
+	continue;
 
       follow_of (nt, follow);
       for (token_t **ptr = follow; *ptr; ptr++)
-        if (tok == *ptr)
-          return prod;
+	if (tok == *ptr)
+	  return prod;
     }
 
   return NULL;

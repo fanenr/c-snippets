@@ -14,7 +14,7 @@ timer_cb (evutil_socket_t fd, short events, void *arg)
     {
       event_del (ev);
       event_assign (ev, event_get_base (ev), fd, events & ~EV_PERSIST,
-                    event_get_callback (ev), event_get_callback_arg (ev));
+		    event_get_callback (ev), event_get_callback_arg (ev));
       event_add (ev, &tv);
     }
 }
@@ -29,7 +29,7 @@ main (void)
   event_base_priority_init (base, 1);
 
   ev = event_new (base, -1, EV_TIMEOUT | EV_PERSIST, timer_cb,
-                  event_self_cbarg ());
+		  event_self_cbarg ());
   event_add (ev, &tv);
 
   for (; loops < 6; loops++)

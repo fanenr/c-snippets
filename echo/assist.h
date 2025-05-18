@@ -22,11 +22,11 @@ extern void echo (int client_fd);
 
 typedef struct
 {
-  int maxi;                 /* high water index into client array */
-  int maxfd;                /* largest fd in read_set */
-  int nready;               /* number of ready fd from select */
-  fd_set read_set;          /* set of all active fds */
-  fd_set ready_set;         /* subset of fds ready for reading */
+  int maxi;		    /* high water index into client array */
+  int maxfd;		    /* largest fd in read_set */
+  int nready;		    /* number of ready fd from select */
+  fd_set read_set;	    /* set of all active fds */
+  fd_set ready_set;	    /* subset of fds ready for reading */
   int clientfd[FD_SETSIZE]; /* set of active fds */
 } pool;
 

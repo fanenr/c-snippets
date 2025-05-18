@@ -23,7 +23,7 @@ union io_data
   do                                                                          \
     {                                                                         \
       fprintf (stderr, "%s:%s:%d: error: ", __FILE__, __FUNCTION__,           \
-               __LINE__);                                                     \
+	       __LINE__);                                                     \
       fprintf (stderr, fmt, ##__VA_ARGS__);                                   \
       fprintf (stderr, "\n");                                                 \
       exit (code);                                                            \
@@ -35,7 +35,7 @@ union io_data
     {                                                                         \
       int ret;                                                                \
       if ((ret = io_uring_submit (ring)) < 0)                                 \
-        error (1, "%s", strerror (-ret));                                     \
+	error (1, "%s", strerror (-ret));                                     \
     }                                                                         \
   while (0)
 
@@ -52,8 +52,8 @@ union io_data
   do                                                                          \
     {                                                                         \
       union io_data data = { cqe->user_data };                                \
-      if ((size_t)cqe->res != data.len)                                       \
-        error (1, "failed to read");                                          \
+      if ((size_t) cqe->res != data.len)                                      \
+	error (1, "failed to read");                                          \
     }                                                                         \
   while (0)
 
@@ -152,7 +152,7 @@ main (int argc, char **argv)
     {
       size_t len = size > BLK_SIZE ? BLK_SIZE : size;
       if (fwrite (blks[i], 1, len, stdout) != len)
-        error (1, "%s", strerror (errno));
+	error (1, "%s", strerror (errno));
       size -= len;
     }
 }

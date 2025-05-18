@@ -4,7 +4,7 @@
 #define defer_cat(s1, s2) defer_cat_ (s1, s2)
 #define defer(code)                                                           \
   inline void defer_cat (defer_func_,                                         \
-                         __LINE__) (char *ptr __attribute__ ((unused)))       \
+			 __LINE__) (char *ptr __attribute__ ((unused)))       \
   {                                                                           \
     code;                                                                     \
   };                                                                          \
@@ -36,6 +36,6 @@ main ()
       tmp = ch2;
     tmp;
   });
-  
+
   printf ("%c", ch3);
 }

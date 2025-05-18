@@ -23,7 +23,7 @@ open_client_fd (const char *host, const char *port)
   serv.sin_family = AF_INET;
   serv.sin_addr.s_addr = sin_addr;
 
-  if (connect (sock, (SA *)&serv, sizeof (serv)) == -1)
+  if (connect (sock, (SA *) &serv, sizeof (serv)) == -1)
     {
       close (sock);
       return -1;
@@ -46,9 +46,9 @@ open_listen_fd (const char *port)
 
   serv.sin_port = sin_port;
   serv.sin_family = AF_INET;
-  serv.sin_addr = (struct in_addr){ .s_addr = sin_addr };
+  serv.sin_addr = (struct in_addr) { .s_addr = sin_addr };
 
-  if (-1 == bind (sock, (SA *)&serv, sizeof (serv)))
+  if (-1 == bind (sock, (SA *) &serv, sizeof (serv)))
     return -1;
 
   if (-1 == listen (sock, 1024))
@@ -91,17 +91,17 @@ add_client (int fd, pool *pool)
   for (int i = 0; i < FD_SETSIZE; i++)
     if (pool->clientfd[i] < 0)
       {
-        /* add client fd to the pool */
-        pool->clientfd[i] = fd;
-        FD_SET (fd, &pool->read_set);
+	/* add client fd to the pool */
+	pool->clientfd[i] = fd;
+	FD_SET (fd, &pool->read_set);
 
-        if (fd > pool->maxfd)
-          pool->maxfd = fd;
+	if (fd > pool->maxfd)
+	  pool->maxfd = fd;
 
-        if (i > pool->maxi)
-          pool->maxi = i;
+	if (i > pool->maxi)
+	  pool->maxi = i;
 
-        break;
+	break;
       }
 }
 
@@ -116,24 +116,24 @@ check_clients (pool *pool)
       client_fd = pool->clientfd[i];
 
       if (client_fd > 0 && FD_ISSET (client_fd, &pool->ready_set))
-        {
-          pool->nready--;
+	{
+	  pool->nready--;
 
-          if ((n = read (client_fd, buf, MAXLINE - 1)) > 0)
-            {
-              /* write back to client */
-              write (client_fd, buf, n);
-              /* print msg into screen */
-              buf[n] = 0;
-              fprintf (stderr, "from client: %s", buf);
-            }
-          else
-            { /* EOF or Errors */
-              close (client_fd);
-              FD_CLR (client_fd, &pool->read_set);
-              pool->clientfd[i] = -1;
-            }
-        }
+	  if ((n = read (client_fd, buf, MAXLINE - 1)) > 0)
+	    {
+	      /* write back to client */
+	      write (client_fd, buf, n);
+	      /* print msg into screen */
+	      buf[n] = 0;
+	      fprintf (stderr, "from client: %s", buf);
+	    }
+	  else
+	    { /* EOF or Errors */
+	      close (client_fd);
+	      FD_CLR (client_fd, &pool->read_set);
+	      pool->clientfd[i] = -1;
+	    }
+	}
     }
 }
 

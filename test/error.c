@@ -7,7 +7,7 @@
   do                                                                          \
     {                                                                         \
       fprintf (stderr, "%s:%s:%d: error: ", __FILE__, __FUNCTION__,           \
-               __LINE__);                                                     \
+	       __LINE__);                                                     \
       fprintf (stderr, (fmt), ##__VA_ARGS__);                                 \
       fprintf (stderr, "\n");                                                 \
       exit (1);                                                               \

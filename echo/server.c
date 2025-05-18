@@ -37,7 +37,7 @@ main (int argc, char **argv)
   for (;;)
     {
       client_len = sizeof (client_addr);
-      client_fd = accept (listen_fd, (SA *)&client_addr, &client_len);
+      client_fd = accept (listen_fd, (SA *) &client_addr, &client_len);
       sbuf_insert (&sbuf, client_fd);
       fprintf (stderr, "new connection\n");
     }

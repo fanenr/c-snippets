@@ -13,27 +13,27 @@ main (int argc, char **argv)
       printf ("%s: ", argv[i]);
 
       if (lstat (argv[i], &buf) < 0)
-        {
-          err_ret ("lstat error");
-          continue;
-        }
+	{
+	  err_ret ("lstat error");
+	  continue;
+	}
 
       if (S_ISREG (buf.st_mode))
-        ptr = "regular";
+	ptr = "regular";
       else if (S_ISDIR (buf.st_mode))
-        ptr = "directory";
+	ptr = "directory";
       else if (S_ISCHR (buf.st_mode))
-        ptr = "character special";
+	ptr = "character special";
       else if (S_ISBLK (buf.st_mode))
-        ptr = "block special";
+	ptr = "block special";
       else if (S_ISFIFO (buf.st_mode))
-        ptr = "fifo";
+	ptr = "fifo";
       else if (S_ISLNK (buf.st_mode))
-        ptr = "symbolic link";
+	ptr = "symbolic link";
       else if (S_ISSOCK (buf.st_mode))
-        ptr = "socket";
+	ptr = "socket";
       else
-        ptr = "** unknown mode **";
+	ptr = "** unknown mode **";
 
       printf ("%s\n", ptr);
     }

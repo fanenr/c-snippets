@@ -34,7 +34,7 @@ event_cb (struct bufferevent *bev, short events, void *arg)
 
 void
 accept_cb (struct evconnlistener *lev, int clnt, struct sockaddr *addr,
-           int len, void *arg)
+	   int len, void *arg)
 {
   struct event_base *base = evconnlistener_get_base (lev);
   struct bufferevent *bev = bufferevent_socket_new (base, clnt, 0);
@@ -64,7 +64,7 @@ main (void)
 
   if (-1 == (serv = socket (AF_INET, SOCK_STREAM, 0)))
     abort ();
-  if (0 != bind (serv, (void *)&addr, sizeof (addr)))
+  if (0 != bind (serv, (void *) &addr, sizeof (addr)))
     abort ();
   if (0 != listen (serv, 32))
     abort ();

@@ -18,5 +18,5 @@ main (void)
 
   printf ("i is %s\n", type);
   printf ("enable_if is %s constexpr\n",
-          is_constexpr (enable_if (1 + 1 == 2, 1, 0)) ? "" : "not");
+	  is_constexpr (enable_if (1 + 1 == 2, 1, 0)) ? "" : "not");
 }

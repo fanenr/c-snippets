@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #define container_of(ptr, type, member)                                       \
-  ((type *)((void *)(ptr) - offsetof (type, member)))
+  ((type *) ((void *) (ptr) - offsetof (type, member)))
 
 void
 connpool_free (connpool_t *pool)
@@ -78,7 +78,7 @@ init_conn (connpool_t *pool)
 int
 connpool_init (connpool_t *pool, const char *info, size_t n)
 {
-  *pool = (connpool_t){ .info = info };
+  *pool = (connpool_t) { .info = info };
 
   if (0 != pthread_mutex_init (&pool->mtx, NULL))
     return CONNPOOL_ERR_MTX;

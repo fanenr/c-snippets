@@ -9,7 +9,7 @@ static char *rand_string (size_t len);
 static inline void
 rand_init (void)
 {
-  srand ((unsigned)time (NULL));
+  srand ((unsigned) time (NULL));
 }
 
 static inline long
@@ -25,7 +25,7 @@ rand_string (size_t len)
   if (!ret)
     return NULL;
   for (size_t i = 0; i < len; i++)
-    ret[i] = (char)rand_long (32, 127);
+    ret[i] = (char) rand_long (32, 127);
   ret[len] = '\0';
   return ret;
 }

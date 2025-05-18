@@ -34,7 +34,7 @@ main (int argc, char **argv)
       write (client_fd, buf, strlen (buf));
 
       if ((nread = read (client_fd, buf, MAXLINE - 1)) < 1)
-        break;
+	break;
       buf[nread] = 0;
 
       fprintf (stderr, "from server: %s", buf);

@@ -71,9 +71,9 @@ enum
 #define TK_IS_SEP(KIND) (TK_SEP_ST < (KIND) && (KIND) < TK_SEP_ED)
 
 const char *tk_keys[] = {
-  [TK_KEY_IF] = "if",       [TK_KEY_DO] = "do",
-  [TK_KEY_VAR] = "var",     [TK_KEY_ODD] = "odd",
-  [TK_KEY_END] = "end",     [TK_KEY_CALL] = "call",
+  [TK_KEY_IF] = "if",	    [TK_KEY_DO] = "do",
+  [TK_KEY_VAR] = "var",	    [TK_KEY_ODD] = "odd",
+  [TK_KEY_END] = "end",	    [TK_KEY_CALL] = "call",
   [TK_KEY_THEN] = "then",   [TK_KEY_READ] = "read",
   [TK_KEY_CONST] = "const", [TK_KEY_BEGIN] = "begin",
   [TK_KEY_WHILE] = "while", [TK_KEY_WRITE] = "write",
@@ -85,7 +85,7 @@ struct
   int kind; /* TK_XXX */
   union
   {
-    int ival;      /* for TK_NUM */
+    int ival;	   /* for TK_NUM */
     char sval[64]; /* for other  */
   };
 } tok;
@@ -115,29 +115,29 @@ main (int argc, char **args)
       num++;
 
       switch ((kind = tok.kind))
-        {
-        case TK_ID:
-          printf ("%3d 标识符 %-24s", num, tok.sval);
-          break;
+	{
+	case TK_ID:
+	  printf ("%3d 标识符 %-24s", num, tok.sval);
+	  break;
 
-        case TK_NUM:
-          printf ("%3d 常数   %-24d", num, tok.ival);
-          break;
+	case TK_NUM:
+	  printf ("%3d 常数   %-24d", num, tok.ival);
+	  break;
 
-        case TK_UNKNOW:
-          printf ("%3d 非法   %-24s", num, tok.sval);
-          break;
+	case TK_UNKNOW:
+	  printf ("%3d 非法   %-24s", num, tok.sval);
+	  break;
 
-        default:
-          if (TK_IS_OP (kind))
-            printf ("%3d 运算符 %-24s", num, tok.sval);
-          else if (TK_IS_KEY (kind))
-            printf ("%3d 保留字 %-24s", num, tok.sval);
-          else if (TK_IS_SEP (kind))
-            printf ("%3d 界符   %-24s", num, tok.sval);
-          else
-            error ("unknow type token");
-        }
+	default:
+	  if (TK_IS_OP (kind))
+	    printf ("%3d 运算符 %-24s", num, tok.sval);
+	  else if (TK_IS_KEY (kind))
+	    printf ("%3d 保留字 %-24s", num, tok.sval);
+	  else if (TK_IS_SEP (kind))
+	    printf ("%3d 界符   %-24s", num, tok.sval);
+	  else
+	    error ("unknow type token");
+	}
 
       putchar (num % 2 ? '\t' : '\n');
     }
@@ -165,18 +165,18 @@ tok_next (void)
       tok.sval[len++] = ch;
 
       for (; isalnum ((ch = fgetc (file)));)
-        tok.sval[len++] = ch;
+	tok.sval[len++] = ch;
 
       ungetc (ch, file);
       tok.sval[len] = 0;
 
       for (int i = TK_KEY_ST + 1; i < TK_KEY_ED; i++)
-        { /* determine whether it's a keyword */
-          if (strcmp (tok.sval, tk_keys[i]) != 0)
-            continue;
-          tok.kind = i;
-          break;
-        }
+	{ /* determine whether it's a keyword */
+	  if (strcmp (tok.sval, tk_keys[i]) != 0)
+	    continue;
+	  tok.kind = i;
+	  break;
+	}
 
       goto end;
     }
@@ -187,7 +187,7 @@ tok_next (void)
       tok.ival = ch - '0';
 
       for (; isdigit ((ch = fgetc (file)));)
-        tok.ival = tok.ival * 10 + ch - '0';
+	tok.ival = tok.ival * 10 + ch - '0';
 
       ungetc (ch, file);
       goto end;
@@ -245,44 +245,44 @@ tok_next (void)
 
     case '<':
       if ((ch = fgetc (file)) != '=')
-        {
-          ungetc (ch, file);
-          kind = TK_OP_LT;
-          sval = "<";
-        }
+	{
+	  ungetc (ch, file);
+	  kind = TK_OP_LT;
+	  sval = "<";
+	}
       else
-        {
-          kind = TK_OP_LTEQ;
-          sval = "<=";
-        }
+	{
+	  kind = TK_OP_LTEQ;
+	  sval = "<=";
+	}
       break;
 
     case '>':
       if ((ch = fgetc (file)) != '=')
-        {
-          ungetc (ch, file);
-          kind = TK_OP_GT;
-          sval = ">";
-        }
+	{
+	  ungetc (ch, file);
+	  kind = TK_OP_GT;
+	  sval = ">";
+	}
       else
-        {
-          kind = TK_OP_GTEQ;
-          sval = ">=";
-        }
+	{
+	  kind = TK_OP_GTEQ;
+	  sval = ">=";
+	}
       break;
 
     case ':':
       if ((ch = fgetc (file)) != '=')
-        {
-          ungetc (ch, file);
-          kind = TK_UNKNOW;
-          sval = ":";
-        }
+	{
+	  ungetc (ch, file);
+	  kind = TK_UNKNOW;
+	  sval = ":";
+	}
       else
-        {
-          kind = TK_OP_COLEQ;
-          sval = ":=";
-        }
+	{
+	  kind = TK_OP_COLEQ;
+	  sval = ":=";
+	}
       break;
 
     default:

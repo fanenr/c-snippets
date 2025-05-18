@@ -63,11 +63,11 @@ init (void)
 
   json_t *base
       = json_pack ("{s:s,s:[{s:s,s:s}]}", "model", "Qwen/Qwen2.5-72B-Instruct",
-                   "messages", "role", "user", "content", "AI 是什么？");
+		   "messages", "role", "user", "content", "AI 是什么？");
   json_t *advanced
       = json_pack ("{s:s,s:[{s:s,s:s}]}", "model",
-                   "meta-llama/Meta-Llama-3.1-405B-Instruct", "messages",
-                   "role", "user", "content", "AI 是什么？");
+		   "meta-llama/Meta-Llama-3.1-405B-Instruct", "messages",
+		   "role", "user", "content", "AI 是什么？");
 
   chat_base_data = json_dumps (base, 0);
   chat_advanced_data = json_dumps (advanced, 0);
@@ -171,11 +171,11 @@ hnd_models (pack_t *pack)
       json_t *arr = json_object_get (json, "data");
 
       for (size_t n = json_array_size (arr), i = 0; i < n; i++)
-        {
-          json_t *id = json_object_get (json_array_get (arr, i), "id");
-          fputs (json_string_value (id), models);
-          fputc ('\n', models);
-        }
+	{
+	  json_t *id = json_object_get (json_array_get (arr, i), "id");
+	  fputs (json_string_value (id), models);
+	  fputc ('\n', models);
+	}
 
       json_decref (json);
       got_models = true;
@@ -226,7 +226,7 @@ work (const char *path)
   for (char key[64]; fgets (key, sizeof (key), file);)
     {
       if (key[0] == '\n')
-        continue;
+	continue;
 
       size_t len = strlen (key);
       key[len - 1] = '\0';
@@ -250,32 +250,32 @@ work (const char *path)
       curl_multi_poll (multi, NULL, 0, 1000, NULL);
 
       for (struct CURLMsg *m; (m = curl_multi_info_read (multi, &c));)
-        if (m->msg == CURLMSG_DONE)
-          {
-            long code;
-            pack_t *pack;
-            CURL *hnd = m->easy_handle;
+	if (m->msg == CURLMSG_DONE)
+	  {
+	    long code;
+	    pack_t *pack;
+	    CURL *hnd = m->easy_handle;
 
-            curl_easy_getinfo (hnd, CURLINFO_PRIVATE, &pack);
-            curl_easy_getinfo (hnd, CURLINFO_RESPONSE_CODE, &code);
+	    curl_easy_getinfo (hnd, CURLINFO_PRIVATE, &pack);
+	    curl_easy_getinfo (hnd, CURLINFO_RESPONSE_CODE, &code);
 
-            if (code != 200)
-              goto clean;
+	    if (code != 200)
+	      goto clean;
 
-            if (pack->type == TYPE_MODELS && !got_models)
-              hnd_models (pack);
-            else if (pack->type == TYPE_INFO)
-              hnd_info (pack);
-            else
-              hnd_chat (pack);
+	    if (pack->type == TYPE_MODELS && !got_models)
+	      hnd_models (pack);
+	    else if (pack->type == TYPE_INFO)
+	      hnd_info (pack);
+	    else
+	      hnd_chat (pack);
 
-          clean:
-            free (pack->data);
-            free (pack);
+	  clean:
+	    free (pack->data);
+	    free (pack);
 
-            curl_multi_remove_handle (multi, hnd);
-            curl_easy_cleanup (hnd);
-          }
+	    curl_multi_remove_handle (multi, hnd);
+	    curl_easy_cleanup (hnd);
+	  }
     }
 
   FILE *result = fopen ("./result", "w");
@@ -294,7 +294,7 @@ work (const char *path)
       char advanced = res->advanced ? 'y' : 'n';
 
       fprintf (result, "%s, %s, %s, %c, %c\n", key, name, balance, base,
-               advanced);
+	       advanced);
 
       curl_slist_free_all (res->share);
       free (res);

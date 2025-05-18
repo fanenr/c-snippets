@@ -15,7 +15,7 @@ err_doit (int errno_flag, int error, const char *fmt, va_list ap)
   vsnprintf (buf, MAXLINE - 1, fmt, ap);
   if (errno_flag)
     snprintf (buf + strlen (buf), MAXLINE - strlen (buf) - 1, ": %s",
-              strerror (error));
+	      strerror (error));
   strcat (buf, "\n");
   fflush (stdout);
   fputs (buf, stderr);
